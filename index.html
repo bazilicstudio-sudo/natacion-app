@@ -3,28 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>🏊 Sistema Competencia Elite PRO</title>
-<link rel="manifest" href="manifest.json">
-<meta name="theme-color" content="#0f172a">
-
-<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
-<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
-<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
-function playStartSound(){
-    const ctx = new (window.AudioContext || window.webkitAudioContext)();
-    const osc = ctx.createOscillator();
-    const gain = ctx.createGain();
-
-    osc.type = "square";
-    osc.frequency.setValueAtTime(800, ctx.currentTime);
-    gain.gain.setValueAtTime(1, ctx.currentTime);
-
-    osc.connect(gain);
-    gain.connect(ctx.destination);
-
-    osc.start();
-    osc.stop(ctx.currentTime + 0.15);
-}
+<title>🏊 Sistema Competencia Elite</title>
 
 <style>
 body{
@@ -43,7 +22,7 @@ margin-bottom:12px;
 }
 
 button{
-padding:14px;
+padding:12px;
 margin:6px 0;
 border:none;
 border-radius:12px;
@@ -74,11 +53,19 @@ margin:10px 0;
 }
 
 .hidden{display:none}
+
+select,input{
+width:100%;
+padding:8px;
+margin:5px 0;
+border-radius:8px;
+border:none;
+}
 </style>
 </head>
 <body>
 
-<h2>🏊 Sistema Competencia Elite PRO</h2>
+<h2>🏊 Sistema Competencia Elite</h2>
 
 <div id="setupCard" class="card hidden">
 <h3>Crear Administrador</h3>
@@ -111,13 +98,13 @@ margin:10px 0;
 <div class="card">
 <h3>Evento</h3>
 <input type="text" id="eventName" placeholder="Nombre del evento">
-<input type="number" id="laneCount" min="2" max="10" value="8">
+<input type="number" id="laneCount" min="2" max="10" value="4">
 <button class="btn-success" onclick="startCompetition()">Crear Carriles</button>
 </div>
 
 <div class="card">
 <button class="btn-danger" onclick="prepareStart()">🚦 PREPARADOS</button>
-<div id="startSignal" style="text-align:center;font-size:22px;margin-top:10px;"></div>
+<div id="startSignal" style="text-align:center;font-size:20px;margin-top:10px;"></div>
 </div>
 
 <div class="card">
@@ -136,7 +123,7 @@ margin:10px 0;
 
 <div class="card">
 <h3>Crear Atleta</h3>
-<input type="text" id="newAthlete" placeholder="Usuario">
+<input type="text" id="newAthlete" placeholder="Nombre">
 <input type="password" id="newPass" placeholder="Contraseña">
 <input type="number" id="newAge" placeholder="Edad">
 <select id="newGender">
@@ -160,18 +147,15 @@ margin:10px 0;
 <script>
 
 // ================= VARIABLES =================
-
-let currentUser=null;
-let laneTimers={};
-let globalStartTime=null;
-let globalInterval=null;
-let reactionStartTime=null;
-let raceStarted=false;
-let results=[];
+let laneTimers = {};
+let globalStartTime = null;
+let globalInterval = null;
+let reactionStartTime = null;
+let raceStarted = false;
+let results = [];
 
 // ================= INICIO =================
-
-window.onload=()=>{
+window.onload = () => {
 if(!localStorage.getItem("admin")){
 setupCard.classList.remove("hidden");
 }else{
@@ -180,7 +164,6 @@ loginCard.classList.remove("hidden");
 };
 
 // ================= ADMIN =================
-
 function createAdmin(){
 localStorage.setItem("admin",
 JSON.stringify({user:adminUser.value,pass:adminPass.value}));
@@ -212,7 +195,6 @@ if(sec==="admin")adminSection.classList.remove("hidden");
 }
 
 // ================= ATLETAS =================
-
 function createAthlete(){
 let athletes=JSON.parse(localStorage.getItem("athletes")||"[]");
 
@@ -242,15 +224,14 @@ athletes.forEach(a=>{
 athleteList.innerHTML+=`
 <div>
 <strong>${a.user}</strong>
-| ${a.age} años
 | ${a.gender}
+| ${a.age} años
 | ${a.category}
 </div>`;
 });
 }
 
 // ================= COMPETENCIA =================
-
 function startCompetition(){
 
 lanes.innerHTML="";
@@ -258,6 +239,7 @@ ranking.innerHTML="";
 results=[];
 laneTimers={};
 
+let athletes=JSON.parse(localStorage.getItem("athletes")||"[]");
 let count=parseInt(laneCount.value);
 
 for(let i=1;i<=count;i++){
@@ -266,23 +248,48 @@ laneTimers[i]={
 finished:false,
 currentTime:0,
 reactionTime:null,
-falseStart:false
+falseStart:false,
+athlete:null
 };
+
+let options = athletes.map(a=>
+`<option value="${a.user}">
+${a.user} | ${a.gender} | ${a.age} años
+</option>`).join("");
 
 lanes.innerHTML+=`
 <div class="lane" id="lane${i}">
 <strong>Carril ${i}</strong>
+
+<select onchange="assignAthlete(${i}, this.value)">
+<option value="">Asignar atleta</option>
+${options}
+</select>
+
+<div id="athleteInfo${i}" style="font-size:14px;margin-top:5px;"></div>
+
 <div class="timeDisplay" id="time${i}">0.000</div>
-<button class="btn-success" onclick="finishLane(${i})">TOCAR</button>
+
+<button class="btn-success" onclick="finishLane(${i})">
+TOCAR
+</button>
+
 <div id="reaction${i}" style="font-size:14px;"></div>
 </div>`;
 }
 }
 
-// ================= SALIDA PROFESIONAL =================
+function assignAthlete(lane, username){
+let athletes=JSON.parse(localStorage.getItem("athletes")||"[]");
+let athlete=athletes.find(a=>a.user===username);
+if(!athlete) return;
+laneTimers[lane].athlete=athlete;
+document.getElementById("athleteInfo"+lane).innerHTML=
+`${athlete.gender} | ${athlete.age} años`;
+}
 
+// ================= SALIDA =================
 function prepareStart(){
-
 raceStarted=false;
 startSignal.innerHTML="En sus marcas...";
 startSignal.style.color="white";
@@ -290,10 +297,7 @@ startSignal.style.color="white";
 let randomDelay=Math.floor(Math.random()*2000)+1000;
 
 setTimeout(()=>{
-startSignal.innerHTML="🔊 ¡YA!";
-playStartSound();
-if(navigator.vibrate) navigator.vibrate(200);
-speechSynthesis.speak(new SpeechSynthesisUtterance("Ya"));
+startSignal.innerHTML="¡YA!";
 startSignal.style.color="#22c55e";
 
 reactionStartTime=Date.now();
@@ -304,55 +308,27 @@ raceStarted=true;
 }
 
 function startAllLanes(){
-
 globalStartTime=Date.now();
-
 globalInterval=setInterval(()=>{
-
 let now=Date.now();
-
 Object.keys(laneTimers).forEach(i=>{
-
 if(!laneTimers[i].finished){
-
 let elapsed=now-globalStartTime;
 laneTimers[i].currentTime=elapsed;
-
 document.getElementById("time"+i).innerText=
 (elapsed/1000).toFixed(3);
 }
-
 });
-
 },10);
 }
 
 function finishLane(i){
 
-if(laneTimers[i].finished)return;
+if(laneTimers[i].finished) return;
 
 // SALIDA FALSA
 if(!raceStarted){
-
 laneTimers[i].falseStart=true;
-
-document.getElementById("lane"+i).style.background="#7f1d1d";
-document.getElementById("reaction"+i).innerHTML="❌ SALIDA FALSA";
-
-results.push({
-lane:i,
-time:999,
-reaction:0,
-penalty:"DQ"
-});
-
-ranking.innerHTML+=`
-<div style="color:red">
-Carril ${i} DESCALIFICADO
-</div>`;
-
-return;
-}
 document.getElementById("lane"+i).style.background="#7f1d1d";
 document.getElementById("reaction"+i).innerHTML="❌ SALIDA FALSA";
 return;
@@ -362,18 +338,21 @@ laneTimers[i].finished=true;
 
 let now=Date.now();
 let reaction=(now-reactionStartTime)/1000;
-laneTimers[i].reactionTime=reaction;
-
 let finalTime=laneTimers[i].currentTime/1000;
 
 document.getElementById("lane"+i).classList.add("finished");
 document.getElementById("reaction"+i).innerHTML=
 `Reacción: ${reaction.toFixed(3)}s`;
 
+let athleteData = laneTimers[i].athlete;
+
 results.push({
 lane:i,
 time:finalTime,
-reaction:reaction
+reaction:reaction,
+name: athleteData ? athleteData.user : "Sin atleta",
+gender: athleteData ? athleteData.gender : "",
+age: athleteData ? athleteData.age : ""
 });
 
 results.sort((a,b)=>a.time-b.time);
@@ -383,7 +362,9 @@ ranking.innerHTML="";
 results.forEach((r,index)=>{
 ranking.innerHTML+=`
 <div>
-${index+1}° Carril ${r.lane}
+${index+1}° ${r.name}
+(Carril ${r.lane})
+| ${r.gender} ${r.age ? "- "+r.age+" años" : ""}
 | Tiempo: ${r.time.toFixed(3)}s
 | Reacción: ${r.reaction.toFixed(3)}s
 </div>`;
@@ -394,10 +375,7 @@ if(Object.values(laneTimers)
 clearInterval(globalInterval);
 }
 }
-if("serviceWorker" in navigator){
-navigator.serviceWorker.register("sw.js");
-}
+
 </script>
 </body>
 </html>
-

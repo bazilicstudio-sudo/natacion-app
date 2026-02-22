@@ -3,82 +3,38 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Sistema Competencia Elite PRO</title>
+<title>Sistema Competencia Elite FINAL</title>
 
 <style>
-body{
-margin:0;
-font-family:sans-serif;
-background:#0f172a;
-color:white;
-padding:10px;
-}
-.card{
-background:#1f2937;
-padding:15px;
-border-radius:15px;
-margin-bottom:15px;
-}
-button{
-padding:12px;
-margin:6px 0;
-border:none;
-border-radius:12px;
-font-weight:bold;
-cursor:pointer;
-font-size:16px;
-width:100%;
-}
+body{margin:0;font-family:sans-serif;background:#0f172a;color:white;padding:10px;}
+.card{background:#1f2937;padding:15px;border-radius:15px;margin-bottom:15px;}
+button{padding:10px;margin:5px 0;border:none;border-radius:10px;font-weight:bold;cursor:pointer;width:100%;}
 .btn{background:#2563eb;color:white}
 .btn-success{background:#16a34a;color:white}
 .btn-danger{background:#dc2626;color:white}
-.lane{
-background:#111827;
-padding:15px;
-margin:10px 0;
-border-radius:15px;
-text-align:center;
-}
+.btn-warning{background:#f59e0b;color:white}
+.lane{background:#111827;padding:15px;margin:10px 0;border-radius:15px;text-align:center;}
 .lane.finished{background:#1e293b;}
-.timeDisplay{
-font-size:26px;
-font-weight:bold;
-margin:10px 0;
-}
+.timeDisplay{font-size:24px;font-weight:bold;margin:10px 0;}
 .hidden{display:none}
-input,select{
-width:100%;
-padding:8px;
-margin:5px 0;
-border-radius:8px;
-border:none;
-}
-img{
-max-width:100px;
-border-radius:50%;
-margin-top:10px;
-}
-.medal{
-font-size:22px;
-}
+input,select{width:100%;padding:8px;margin:5px 0;border-radius:8px;border:none;}
+img{max-width:100px;border-radius:50%;margin-top:10px;}
+.medal{font-size:20px;}
 </style>
 </head>
 <body>
 
-<h2>🏊 Sistema Competencia Elite PRO</h2>
+<h2>🏊 Sistema Competencia Elite FINAL</h2>
 
 <!-- LOGIN -->
 <div id="loginCard" class="card">
 <h3>Iniciar Sesión</h3>
-
 <select id="roleSelect">
 <option value="admin">Entrenador</option>
 <option value="athlete">Atleta</option>
 </select>
-
 <input type="text" id="loginUser" placeholder="Usuario">
 <input type="password" id="loginPass" placeholder="Contraseña">
-
 <button class="btn" onclick="login()">Ingresar</button>
 </div>
 
@@ -88,7 +44,7 @@ font-size:22px;
 <button class="btn-danger" onclick="logout()">Cerrar Sesión</button>
 </div>
 
-<!-- PANEL ADMIN -->
+<!-- ADMIN PANEL -->
 <div id="adminPanel" class="hidden">
 
 <div class="card">
@@ -113,21 +69,17 @@ font-size:22px;
 
 </div>
 
-<!-- PANEL ATLETA -->
+<!-- ATHLETE PANEL -->
 <div id="athletePanel" class="hidden">
-
 <div class="card">
 <h3>Mi Perfil</h3>
 <div id="profileInfo"></div>
-
 <input type="file" id="photoInput">
 <input type="text" id="editPhone" placeholder="Teléfono">
 <input type="email" id="editEmail" placeholder="Correo">
-
 <button class="btn-success" onclick="saveProfile()">Guardar Cambios</button>
 <button class="btn" onclick="downloadMyResults()">Descargar Mis Resultados</button>
 </div>
-
 </div>
 
 <!-- COMPETENCIA -->
@@ -135,7 +87,10 @@ font-size:22px;
 <h3>Competencia</h3>
 <input type="number" id="laneCount" value="4" min="2" max="10">
 <button class="btn-success" onclick="startCompetition()">Crear Carriles</button>
-<button class="btn-danger" onclick="prepareStart()">🚦 PREPARADOS</button>
+<button class="btn-success" onclick="startRaceNow()">🚦 INICIAR AHORA</button>
+<button class="btn-warning" onclick="pauseRace()">⏸ Pausar</button>
+<button class="btn-success" onclick="resumeRace()">▶ Reanudar</button>
+<button class="btn-danger" onclick="resetRace()">🔄 Reiniciar Carrera</button>
 <div id="lanes"></div>
 </div>
 
@@ -153,18 +108,19 @@ let currentUser=null;
 let currentRole=null;
 let results=[];
 let laneTimers={};
-let globalStartTime;
-let globalInterval;
-let reactionStartTime;
+let globalStartTime=0;
+let globalInterval=null;
 let raceStarted=false;
+let paused=false;
+let pausedTime=0;
 
+/* ADMIN DEFAULT */
 if(!localStorage.getItem("admin")){
-localStorage.setItem("admin",
-JSON.stringify({user:"admin",pass:"1234"}));
+localStorage.setItem("admin",JSON.stringify({user:"admin",pass:"1234"}));
 }
 
+/* LOGIN */
 function login(){
-
 let role=roleSelect.value;
 let admin=JSON.parse(localStorage.getItem("admin"));
 let athletes=JSON.parse(localStorage.getItem("athletes")||"[]");
@@ -172,12 +128,9 @@ let athletes=JSON.parse(localStorage.getItem("athletes")||"[]");
 if(role==="admin"){
 if(loginUser.value===admin.user && loginPass.value===admin.pass){
 currentRole="admin";
-currentUser=admin.user;
 adminPanel.classList.remove("hidden");
-}
-else{alert("Credenciales incorrectas");return;}
-}
-else{
+}else{alert("Credenciales incorrectas");return;}
+}else{
 let athlete=athletes.find(a=>a.user===loginUser.value && a.pass===loginPass.value);
 if(!athlete){alert("Credenciales incorrectas");return;}
 currentRole="athlete";
@@ -193,6 +146,7 @@ loadAthletes();
 
 function logout(){location.reload();}
 
+/* ATHLETES */
 function createAthlete(){
 let athletes=JSON.parse(localStorage.getItem("athletes")||"[]");
 athletes.push({
@@ -214,8 +168,7 @@ let athletes=JSON.parse(localStorage.getItem("athletes")||"[]");
 athleteList.innerHTML="";
 athletes.forEach(a=>{
 athleteList.innerHTML+=`
-<div>
-${a.user} | ${a.gender} | ${a.age}
+<div>${a.user} | ${a.gender} | ${a.age}
 <button onclick="deleteAthlete('${a.user}')">Eliminar</button>
 </div>`;
 });
@@ -228,18 +181,11 @@ localStorage.setItem("athletes",JSON.stringify(athletes));
 loadAthletes();
 }
 
+/* PROFILE */
 function loadProfile(){
 let athletes=JSON.parse(localStorage.getItem("athletes")||"[]");
 let athlete=athletes.find(a=>a.user===currentUser);
-
-profileInfo.innerHTML=`
-Usuario: ${athlete.user}<br>
-Edad: ${athlete.age}<br>
-Sexo: ${athlete.gender}<br>
-Categoría: ${athlete.category}<br>
-<img src="${athlete.photo||''}">
-`;
-
+profileInfo.innerHTML=`Usuario: ${athlete.user}<br>Edad: ${athlete.age}<br>Sexo: ${athlete.gender}<br><img src="${athlete.photo||''}">`;
 editPhone.value=athlete.phone||"";
 editEmail.value=athlete.email||"";
 }
@@ -247,7 +193,6 @@ editEmail.value=athlete.email||"";
 function saveProfile(){
 let athletes=JSON.parse(localStorage.getItem("athletes")||"[]");
 let athlete=athletes.find(a=>a.user===currentUser);
-
 athlete.phone=editPhone.value;
 athlete.email=editEmail.value;
 
@@ -266,69 +211,71 @@ loadProfile();
 }
 }
 
+/* COMPETENCIA */
 function startCompetition(){
 lanes.innerHTML="";
 results=[];
 laneTimers={};
+clearInterval(globalInterval);
+raceStarted=false;
+paused=false;
 
 let athletes=JSON.parse(localStorage.getItem("athletes")||"[]");
 
 for(let i=1;i<=laneCount.value;i++){
 laneTimers[i]={finished:false,currentTime:0,athlete:null};
 
-let options=athletes.map(a=>
-`<option value="${a.user}">${a.user}</option>`).join("");
+let options=athletes.map(a=>`<option value="${a.user}">${a.user}</option>`).join("");
 
 lanes.innerHTML+=`
 <div class="lane" id="lane${i}">
-Carril ${i}
+<strong>Carril ${i}</strong>
 <select onchange="laneTimers[${i}].athlete=this.value">
 <option value="">Asignar atleta</option>
 ${options}
 </select>
 <div class="timeDisplay" id="time${i}">0.000</div>
 <button onclick="finishLane(${i})">TOCAR</button>
+<button class="btn-warning" onclick="undoFinish(${i})">↩ Reanudar Carril</button>
 </div>`;
 }
 }
 
-function prepareStart(){
-raceStarted=false;
-let delay=Math.floor(Math.random()*2000)+1000;
-setTimeout(()=>{
-reactionStartTime=Date.now();
+function startRaceNow(){
+if(raceStarted) return;
 raceStarted=true;
+paused=false;
 globalStartTime=Date.now();
 globalInterval=setInterval(updateTimers,10);
-},delay);
 }
 
 function updateTimers(){
+if(paused) return;
 let now=Date.now();
 for(let i in laneTimers){
 if(!laneTimers[i].finished){
 let elapsed=now-globalStartTime;
 laneTimers[i].currentTime=elapsed;
-document.getElementById("time"+i).innerText=
-(elapsed/1000).toFixed(3);
+document.getElementById("time"+i).innerText=(elapsed/1000).toFixed(3);
 }
 }
 }
 
 function finishLane(i){
-if(laneTimers[i].finished)return;
+if(!raceStarted || laneTimers[i].finished) return;
+
 laneTimers[i].finished=true;
-
 let finalTime=laneTimers[i].currentTime/1000;
-let reaction=(Date.now()-reactionStartTime)/1000;
 
-results.push({
-name:laneTimers[i].athlete||"Sin atleta",
-time:finalTime,
-reaction:reaction
-});
-
+results.push({lane:i,name:laneTimers[i].athlete||"Sin atleta",time:finalTime});
 results.sort((a,b)=>a.time-b.time);
+renderRanking();
+}
+
+function undoFinish(i){
+if(!laneTimers[i].finished) return;
+laneTimers[i].finished=false;
+results=results.filter(r=>r.lane!=i);
 renderRanking();
 }
 
@@ -336,20 +283,47 @@ function renderRanking(){
 ranking.innerHTML="";
 results.forEach((r,index)=>{
 let medal="";
-if(index===0)medal="🥇";
-if(index===1)medal="🥈";
-if(index===2)medal="🥉";
+if(index==0) medal="🥇";
+if(index==1) medal="🥈";
+if(index==2) medal="🥉";
 
 ranking.innerHTML+=`
 <div>
 <span class="medal">${medal}</span>
 ${index+1}° ${r.name}
+(Carril ${r.lane})
 | ${r.time.toFixed(3)}s
-| Reacción ${r.reaction.toFixed(3)}s
 </div>`;
 });
 }
 
+function pauseRace(){
+if(!raceStarted || paused) return;
+paused=true;
+pausedTime=Date.now();
+}
+
+function resumeRace(){
+if(!paused) return;
+paused=false;
+let pauseDuration=Date.now()-pausedTime;
+globalStartTime+=pauseDuration;
+}
+
+function resetRace(){
+clearInterval(globalInterval);
+raceStarted=false;
+paused=false;
+results=[];
+renderRanking();
+for(let i in laneTimers){
+laneTimers[i].finished=false;
+laneTimers[i].currentTime=0;
+document.getElementById("time"+i).innerText="0.000";
+}
+}
+
+/* DESCARGAS */
 function downloadFile(name,text){
 let blob=new Blob([text],{type:"text/plain"});
 let a=document.createElement("a");
@@ -370,7 +344,7 @@ downloadFile("atletas.txt",text);
 function downloadResults(){
 let text="RESULTADOS\n\n";
 results.forEach(r=>{
-text+=`${r.name} - ${r.time}s - ${r.reaction}s\n`;
+text+=`${r.name} - ${r.time}s\n`;
 });
 downloadFile("resultados.txt",text);
 }
@@ -379,7 +353,369 @@ function downloadMyResults(){
 let text="MIS RESULTADOS\n\n";
 results.filter(r=>r.name===currentUser)
 .forEach(r=>{
-text+=`${r.time}s - ${r.reaction}s\n`;
+text+=`${r.time}s\n`;
+});
+downloadFile("mis_resultados.txt",text);
+}
+
+</script>
+</body>
+</html><!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Sistema Competencia Elite FINAL</title>
+
+<style>
+body{margin:0;font-family:sans-serif;background:#0f172a;color:white;padding:10px;}
+.card{background:#1f2937;padding:15px;border-radius:15px;margin-bottom:15px;}
+button{padding:10px;margin:5px 0;border:none;border-radius:10px;font-weight:bold;cursor:pointer;width:100%;}
+.btn{background:#2563eb;color:white}
+.btn-success{background:#16a34a;color:white}
+.btn-danger{background:#dc2626;color:white}
+.btn-warning{background:#f59e0b;color:white}
+.lane{background:#111827;padding:15px;margin:10px 0;border-radius:15px;text-align:center;}
+.lane.finished{background:#1e293b;}
+.timeDisplay{font-size:24px;font-weight:bold;margin:10px 0;}
+.hidden{display:none}
+input,select{width:100%;padding:8px;margin:5px 0;border-radius:8px;border:none;}
+img{max-width:100px;border-radius:50%;margin-top:10px;}
+.medal{font-size:20px;}
+</style>
+</head>
+<body>
+
+<h2>🏊 Sistema Competencia Elite FINAL</h2>
+
+<!-- LOGIN -->
+<div id="loginCard" class="card">
+<h3>Iniciar Sesión</h3>
+<select id="roleSelect">
+<option value="admin">Entrenador</option>
+<option value="athlete">Atleta</option>
+</select>
+<input type="text" id="loginUser" placeholder="Usuario">
+<input type="password" id="loginPass" placeholder="Contraseña">
+<button class="btn" onclick="login()">Ingresar</button>
+</div>
+
+<div id="app" class="hidden">
+
+<div class="card">
+<button class="btn-danger" onclick="logout()">Cerrar Sesión</button>
+</div>
+
+<!-- ADMIN PANEL -->
+<div id="adminPanel" class="hidden">
+
+<div class="card">
+<h3>Crear Atleta</h3>
+<input type="text" id="newAthlete" placeholder="Usuario">
+<input type="password" id="newPass" placeholder="Contraseña">
+<input type="number" id="newAge" placeholder="Edad">
+<select id="newGender">
+<option value="">Sexo</option>
+<option value="Masculino">Masculino</option>
+<option value="Femenino">Femenino</option>
+</select>
+<input type="text" id="newCategory" placeholder="Categoría">
+<button class="btn-success" onclick="createAthlete()">Crear Atleta</button>
+</div>
+
+<div class="card">
+<h3>Lista Atletas</h3>
+<div id="athleteList"></div>
+<button class="btn" onclick="downloadAthletes()">Descargar Lista</button>
+</div>
+
+</div>
+
+<!-- ATHLETE PANEL -->
+<div id="athletePanel" class="hidden">
+<div class="card">
+<h3>Mi Perfil</h3>
+<div id="profileInfo"></div>
+<input type="file" id="photoInput">
+<input type="text" id="editPhone" placeholder="Teléfono">
+<input type="email" id="editEmail" placeholder="Correo">
+<button class="btn-success" onclick="saveProfile()">Guardar Cambios</button>
+<button class="btn" onclick="downloadMyResults()">Descargar Mis Resultados</button>
+</div>
+</div>
+
+<!-- COMPETENCIA -->
+<div class="card">
+<h3>Competencia</h3>
+<input type="number" id="laneCount" value="4" min="2" max="10">
+<button class="btn-success" onclick="startCompetition()">Crear Carriles</button>
+<button class="btn-success" onclick="startRaceNow()">🚦 INICIAR AHORA</button>
+<button class="btn-warning" onclick="pauseRace()">⏸ Pausar</button>
+<button class="btn-success" onclick="resumeRace()">▶ Reanudar</button>
+<button class="btn-danger" onclick="resetRace()">🔄 Reiniciar Carrera</button>
+<div id="lanes"></div>
+</div>
+
+<div class="card">
+<h3>Ranking</h3>
+<div id="ranking"></div>
+<button class="btn" onclick="downloadResults()">Descargar Resultados</button>
+</div>
+
+</div>
+
+<script>
+
+let currentUser=null;
+let currentRole=null;
+let results=[];
+let laneTimers={};
+let globalStartTime=0;
+let globalInterval=null;
+let raceStarted=false;
+let paused=false;
+let pausedTime=0;
+
+/* ADMIN DEFAULT */
+if(!localStorage.getItem("admin")){
+localStorage.setItem("admin",JSON.stringify({user:"admin",pass:"1234"}));
+}
+
+/* LOGIN */
+function login(){
+let role=roleSelect.value;
+let admin=JSON.parse(localStorage.getItem("admin"));
+let athletes=JSON.parse(localStorage.getItem("athletes")||"[]");
+
+if(role==="admin"){
+if(loginUser.value===admin.user && loginPass.value===admin.pass){
+currentRole="admin";
+adminPanel.classList.remove("hidden");
+}else{alert("Credenciales incorrectas");return;}
+}else{
+let athlete=athletes.find(a=>a.user===loginUser.value && a.pass===loginPass.value);
+if(!athlete){alert("Credenciales incorrectas");return;}
+currentRole="athlete";
+currentUser=athlete.user;
+athletePanel.classList.remove("hidden");
+loadProfile();
+}
+
+loginCard.classList.add("hidden");
+app.classList.remove("hidden");
+loadAthletes();
+}
+
+function logout(){location.reload();}
+
+/* ATHLETES */
+function createAthlete(){
+let athletes=JSON.parse(localStorage.getItem("athletes")||"[]");
+athletes.push({
+user:newAthlete.value,
+pass:newPass.value,
+age:newAge.value,
+gender:newGender.value,
+category:newCategory.value,
+phone:"",
+email:"",
+photo:""
+});
+localStorage.setItem("athletes",JSON.stringify(athletes));
+loadAthletes();
+}
+
+function loadAthletes(){
+let athletes=JSON.parse(localStorage.getItem("athletes")||"[]");
+athleteList.innerHTML="";
+athletes.forEach(a=>{
+athleteList.innerHTML+=`
+<div>${a.user} | ${a.gender} | ${a.age}
+<button onclick="deleteAthlete('${a.user}')">Eliminar</button>
+</div>`;
+});
+}
+
+function deleteAthlete(user){
+let athletes=JSON.parse(localStorage.getItem("athletes")||"[]");
+athletes=athletes.filter(a=>a.user!==user);
+localStorage.setItem("athletes",JSON.stringify(athletes));
+loadAthletes();
+}
+
+/* PROFILE */
+function loadProfile(){
+let athletes=JSON.parse(localStorage.getItem("athletes")||"[]");
+let athlete=athletes.find(a=>a.user===currentUser);
+profileInfo.innerHTML=`Usuario: ${athlete.user}<br>Edad: ${athlete.age}<br>Sexo: ${athlete.gender}<br><img src="${athlete.photo||''}">`;
+editPhone.value=athlete.phone||"";
+editEmail.value=athlete.email||"";
+}
+
+function saveProfile(){
+let athletes=JSON.parse(localStorage.getItem("athletes")||"[]");
+let athlete=athletes.find(a=>a.user===currentUser);
+athlete.phone=editPhone.value;
+athlete.email=editEmail.value;
+
+let file=photoInput.files[0];
+if(file){
+let reader=new FileReader();
+reader.onload=function(e){
+athlete.photo=e.target.result;
+localStorage.setItem("athletes",JSON.stringify(athletes));
+loadProfile();
+};
+reader.readAsDataURL(file);
+}else{
+localStorage.setItem("athletes",JSON.stringify(athletes));
+loadProfile();
+}
+}
+
+/* COMPETENCIA */
+function startCompetition(){
+lanes.innerHTML="";
+results=[];
+laneTimers={};
+clearInterval(globalInterval);
+raceStarted=false;
+paused=false;
+
+let athletes=JSON.parse(localStorage.getItem("athletes")||"[]");
+
+for(let i=1;i<=laneCount.value;i++){
+laneTimers[i]={finished:false,currentTime:0,athlete:null};
+
+let options=athletes.map(a=>`<option value="${a.user}">${a.user}</option>`).join("");
+
+lanes.innerHTML+=`
+<div class="lane" id="lane${i}">
+<strong>Carril ${i}</strong>
+<select onchange="laneTimers[${i}].athlete=this.value">
+<option value="">Asignar atleta</option>
+${options}
+</select>
+<div class="timeDisplay" id="time${i}">0.000</div>
+<button onclick="finishLane(${i})">TOCAR</button>
+<button class="btn-warning" onclick="undoFinish(${i})">↩ Reanudar Carril</button>
+</div>`;
+}
+}
+
+function startRaceNow(){
+if(raceStarted) return;
+raceStarted=true;
+paused=false;
+globalStartTime=Date.now();
+globalInterval=setInterval(updateTimers,10);
+}
+
+function updateTimers(){
+if(paused) return;
+let now=Date.now();
+for(let i in laneTimers){
+if(!laneTimers[i].finished){
+let elapsed=now-globalStartTime;
+laneTimers[i].currentTime=elapsed;
+document.getElementById("time"+i).innerText=(elapsed/1000).toFixed(3);
+}
+}
+}
+
+function finishLane(i){
+if(!raceStarted || laneTimers[i].finished) return;
+
+laneTimers[i].finished=true;
+let finalTime=laneTimers[i].currentTime/1000;
+
+results.push({lane:i,name:laneTimers[i].athlete||"Sin atleta",time:finalTime});
+results.sort((a,b)=>a.time-b.time);
+renderRanking();
+}
+
+function undoFinish(i){
+if(!laneTimers[i].finished) return;
+laneTimers[i].finished=false;
+results=results.filter(r=>r.lane!=i);
+renderRanking();
+}
+
+function renderRanking(){
+ranking.innerHTML="";
+results.forEach((r,index)=>{
+let medal="";
+if(index==0) medal="🥇";
+if(index==1) medal="🥈";
+if(index==2) medal="🥉";
+
+ranking.innerHTML+=`
+<div>
+<span class="medal">${medal}</span>
+${index+1}° ${r.name}
+(Carril ${r.lane})
+| ${r.time.toFixed(3)}s
+</div>`;
+});
+}
+
+function pauseRace(){
+if(!raceStarted || paused) return;
+paused=true;
+pausedTime=Date.now();
+}
+
+function resumeRace(){
+if(!paused) return;
+paused=false;
+let pauseDuration=Date.now()-pausedTime;
+globalStartTime+=pauseDuration;
+}
+
+function resetRace(){
+clearInterval(globalInterval);
+raceStarted=false;
+paused=false;
+results=[];
+renderRanking();
+for(let i in laneTimers){
+laneTimers[i].finished=false;
+laneTimers[i].currentTime=0;
+document.getElementById("time"+i).innerText="0.000";
+}
+}
+
+/* DESCARGAS */
+function downloadFile(name,text){
+let blob=new Blob([text],{type:"text/plain"});
+let a=document.createElement("a");
+a.href=URL.createObjectURL(blob);
+a.download=name;
+a.click();
+}
+
+function downloadAthletes(){
+let athletes=JSON.parse(localStorage.getItem("athletes")||"[]");
+let text="LISTA ATLETAS\n\n";
+athletes.forEach(a=>{
+text+=`${a.user} - ${a.email} - ${a.phone}\n`;
+});
+downloadFile("atletas.txt",text);
+}
+
+function downloadResults(){
+let text="RESULTADOS\n\n";
+results.forEach(r=>{
+text+=`${r.name} - ${r.time}s\n`;
+});
+downloadFile("resultados.txt",text);
+}
+
+function downloadMyResults(){
+let text="MIS RESULTADOS\n\n";
+results.filter(r=>r.name===currentUser)
+.forEach(r=>{
+text+=`${r.time}s\n`;
 });
 downloadFile("mis_resultados.txt",text);
 }

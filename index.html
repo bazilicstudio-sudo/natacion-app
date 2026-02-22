@@ -3,10 +3,15 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Sistema Competencia Elite</title>
+<title>🏊 Sistema Competencia Elite</title>
 
+<!-- Chart.js -->
 <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+
+<!-- XLSX -->
 <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+
+<!-- jsPDF -->
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
 
 <style>
@@ -17,13 +22,63 @@ button{padding:8px 12px;margin:4px;border:none;border-radius:8px;font-weight:bol
 .btn{background:#2563eb;color:white}
 .btn-danger{background:#dc2626;color:white}
 .btn-success{background:#16a34a;color:white}
-.lane{background:#111827;padding:10px;margin:8px 0;border-radius:10px;display:flex;justify-content:space-between;align-items:center}
-.lane.running{box-shadow:0 0 15px #22c55e}
+.hidden{display:none}
+.lane{
+background:#111827;
+padding:10px;
+margin:8px 0;
+border-radius:10px;
+display:flex;
+justify-content:space-between;
+align-items:center;
+transition:0.3s;
+}
+.lane.running{
+box-shadow:0 0 15px #22c55e;
+animation:pulse 1s infinite;
+}
+.lane.finished{background:#1e293b;}
+@keyframes pulse{
+0%{opacity:1}
+50%{opacity:0.6}
+100%{opacity:1}
+}
 </style>
 </head>
 <body>
 
-<h2>Sistema Competencia Elite</h2>
+<h2>🏊 Sistema Competencia Elite</h2>
+
+<!-- SETUP ADMIN -->
+<div id="setupCard" class="card hidden">
+<h3>Crear Administrador</h3>
+<input type="text" id="adminUser" placeholder="Usuario Admin">
+<input type="password" id="adminPass" placeholder="Contraseña">
+<button class="btn-success" onclick="createAdmin()">Crear Cuenta</button>
+</div>
+
+<!-- LOGIN -->
+<div id="loginCard" class="card hidden">
+<h3>Login</h3>
+<input type="text" id="loginUser" placeholder="Usuario">
+<input type="password" id="loginPass" placeholder="Contraseña">
+<button class="btn" onclick="login()">Ingresar</button>
+</div>
+
+<div id="app" class="hidden">
+
+<div class="card">
+<button class="btn-danger" onclick="logout()">Cerrar Sesión</button>
+</div>
+
+<div id="adminNav" class="card hidden">
+<button class="btn" onclick="showSection('competition')">Competencia</button>
+<button class="btn" onclick="showSection('training')">Entrenamiento</button>
+<button class="btn" onclick="showSection('admin')">Administración</button>
+</div>
+
+<!-- COMPETENCIA -->
+<div id="competitionSection" class="hidden">
 
 <div class="card">
 <h3>Evento</h3>
@@ -31,7 +86,7 @@ button{padding:8px 12px;margin:4px;border:none;border-radius:8px;font-weight:bol
 <input type="text" id="eventTest" placeholder="Nombre de la prueba (Ej: 100m Libre)">
 <input type="number" id="eventDistance" placeholder="Metros a competir">
 <input type="number" id="laneCount" min="2" max="10" value="8">
-<button class="btn-success" onclick="startCompetition()">Crear Carriles</button>
+<button class="btn-success" onclick="startCompetition()">Iniciar Competencia</button>
 </div>
 
 <div class="card">
@@ -45,12 +100,24 @@ button{padding:8px 12px;margin:4px;border:none;border-radius:8px;font-weight:bol
 </div>
 
 <div class="card">
-<h3>Entrenamiento</h3>
-<input type="text" id="trainingAthlete" placeholder="Nombre del atleta">
-<input type="number" id="trainingTime" placeholder="Tiempo en ms">
-<input type="number" id="trainingHours" placeholder="Horas entrenadas">
-<input type="number" id="trainingSeries" placeholder="Series realizadas">
+<h3>Historial Competencias</h3>
+<div id="history"></div>
+</div>
+
+</div>
+
+<!-- ENTRENAMIENTO -->
+<div id="trainingSection" class="hidden">
+
+<div class="card">
+<h3>Registrar Tiempo</h3>
+<select id="trainingAthlete"></select>
+<input type="number" id="trainingTime" placeholder="Tiempo en milisegundos">
+<input type="number" id="trainingHours" placeholder="Horas de entrenamiento">
+<input type="number" id="trainingSeries" placeholder="Cantidad de series realizadas">
 <button class="btn" onclick="saveTraining()">Guardar</button>
+<button class="btn-success" onclick="exportExcel()">Exportar Excel</button>
+<button class="btn-success" onclick="exportFullPDF()">Exportar PDF Academia</button>
 </div>
 
 <div class="card">
@@ -59,90 +126,212 @@ button{padding:8px 12px;margin:4px;border:none;border-radius:8px;font-weight:bol
 </div>
 
 <div class="card">
-<h3>Gráfico</h3>
-<select id="chartAthlete" onchange="updateChart()"></select>
+<h3>Progreso por Atleta</h3>
+<select id="chartAthlete"></select>
 <canvas id="progressChart"></canvas>
+<button class="btn-success" onclick="exportAthletePDF()">Exportar PDF Individual</button>
+</div>
+
+</div>
+
+<!-- ADMIN -->
+<div id="adminSection" class="hidden">
+
+<div class="card">
+<h3>Crear Atleta</h3>
+<input type="text" id="newAthlete">
+<input type="password" id="newPass" placeholder="Contraseña">
+<button class="btn" onclick="createAthlete()">Crear</button>
 </div>
 
 <div class="card">
-<h3>Análisis</h3>
-<div id="performanceAnalysis"></div>
+<h3>Lista Atletas</h3>
+<div id="athleteList"></div>
 </div>
 
+</div>
+
+<!-- PANEL ATLETA -->
+<div id="athletePanel" class="hidden">
 <div class="card">
-<h3>Ranking General</h3>
-<div id="globalRanking"></div>
+<h3>Mis Resultados</h3>
+<div id="myResults"></div>
+</div>
+</div>
+
 </div>
 
 <script>
-
 // ===============================
-// VARIABLES
+// VARIABLES GLOBALES
 // ===============================
 
-let lanesData = {};
+let currentUser = null;
+let timerInterval = null;
+let startTime = null;
 let results = [];
 let progressChart = null;
 
 // ===============================
-// CREAR CARRILES
+// INICIO
+// ===============================
+
+window.onload = () => {
+    if(!localStorage.getItem("admin")){
+        document.getElementById("setupCard").classList.remove("hidden");
+    }else{
+        document.getElementById("loginCard").classList.remove("hidden");
+    }
+};
+
+// ===============================
+// ADMIN
+// ===============================
+
+function createAdmin(){
+    const user = adminUser.value;
+    const pass = adminPass.value;
+    localStorage.setItem("admin", JSON.stringify({user, pass}));
+    alert("Admin creado");
+    location.reload();
+}
+
+function login(){
+    const admin = JSON.parse(localStorage.getItem("admin"));
+    const athletes = JSON.parse(localStorage.getItem("athletes") || "[]");
+
+    if(loginUser.value === admin.user && loginPass.value === admin.pass){
+        currentUser = "admin";
+        loginCard.classList.add("hidden");
+        app.classList.remove("hidden");
+        adminNav.classList.remove("hidden");
+        showSection("competition");
+        loadAthletes();
+    }else{
+        const athlete = athletes.find(a=>a.user===loginUser.value && a.pass===loginPass.value);
+        if(athlete){
+            currentUser = athlete.user;
+            loginCard.classList.add("hidden");
+            app.classList.remove("hidden");
+            athletePanel.classList.remove("hidden");
+            loadMyResults();
+        }else{
+            alert("Credenciales incorrectas");
+        }
+    }
+}
+
+function logout(){
+    location.reload();
+}
+
+// ===============================
+// SECCIONES
+// ===============================
+
+function showSection(sec){
+    competitionSection.classList.add("hidden");
+    trainingSection.classList.add("hidden");
+    adminSection.classList.add("hidden");
+
+    if(sec==="competition") competitionSection.classList.remove("hidden");
+    if(sec==="training") trainingSection.classList.remove("hidden");
+    if(sec==="admin") adminSection.classList.remove("hidden");
+}
+
+// ===============================
+// ATLETAS
+// ===============================
+
+function createAthlete(){
+    let athletes = JSON.parse(localStorage.getItem("athletes")||"[]");
+    athletes.push({user:newAthlete.value, pass:newPass.value});
+    localStorage.setItem("athletes", JSON.stringify(athletes));
+    newAthlete.value="";
+    newPass.value="";
+    loadAthletes();
+}
+
+function loadAthletes(){
+    let athletes = JSON.parse(localStorage.getItem("athletes")||"[]");
+    athleteList.innerHTML="";
+    trainingAthlete.innerHTML="";
+    chartAthlete.innerHTML="";
+    athletes.forEach(a=>{
+        athleteList.innerHTML+=`<div>${a.user}</div>`;
+        trainingAthlete.innerHTML+=`<option>${a.user}</option>`;
+        chartAthlete.innerHTML+=`<option>${a.user}</option>`;
+    });
+}
+
+// ===============================
+// COMPETENCIA
 // ===============================
 
 function startCompetition(){
     lanes.innerHTML="";
     results=[];
-    lanesData={};
-    let count=parseInt(laneCount.value);
+    const count = parseInt(laneCount.value);
 
     for(let i=1;i<=count;i++){
-        lanesData[i]={start:0,elapsed:0,interval:null,running:false};
-
         lanes.innerHTML+=`
         <div class="lane" id="lane${i}">
-        <span>Carril ${i}</span>
-        <div>
-        <button class="btn" onclick="startLane(${i})">▶</button>
-        <button class="btn" onclick="pauseLane(${i})">⏸</button>
-        <button class="btn-success" onclick="finishLane(${i})">🏁</button>
-        <span id="time${i}">0.000</span>
-        </div>
+            <span>Carril ${i}</span>
+            <div>
+                <button class="btn" onclick="startRace(${i})">Start</button>
+                <button class="btn-success" onclick="finishRace(${i})">Finish</button>
+                <span id="time${i}">0.000</span>
+            </div>
         </div>`;
     }
 }
 
-// ===============================
-// CONTROL INDIVIDUAL POR CARRIL
-// ===============================
-
-function startLane(i){
-    if(lanesData[i].running) return;
-
-    lanesData[i].running=true;
-    lanesData[i].start=Date.now()-lanesData[i].elapsed;
-
-    lanesData[i].interval=setInterval(()=>{
-        lanesData[i].elapsed=Date.now()-lanesData[i].start;
-        document.getElementById("time"+i).innerText=
-        (lanesData[i].elapsed/1000).toFixed(3);
+function startRace(i){
+    startTime = Date.now();
+    document.getElementById("lane"+i).classList.add("running");
+    timerInterval = setInterval(()=>{
+        let t = Date.now()-startTime;
+        document.getElementById("time"+i).innerText=(t/1000).toFixed(3);
     },10);
 }
 
-function pauseLane(i){
-    clearInterval(lanesData[i].interval);
-    lanesData[i].running=false;
-}
+function finishRace(i){
+    clearInterval(timerInterval);
+    let finalTime = parseFloat(document.getElementById("time"+i).innerText);
+    document.getElementById("lane"+i).classList.remove("running");
+    document.getElementById("lane"+i).classList.add("finished");
 
-function finishLane(i){
-    clearInterval(lanesData[i].interval);
-    lanesData[i].running=false;
-
-    let finalTime=(lanesData[i].elapsed/1000);
     results.push({lane:i,time:finalTime});
     results.sort((a,b)=>a.time-b.time);
 
     ranking.innerHTML="";
     results.forEach((r,index)=>{
-        ranking.innerHTML+=`<div>${index+1}° - Carril ${r.lane} - ${r.time.toFixed(3)}s</div>`;
+        ranking.innerHTML+=`<div>🥇 ${index+1}° - Carril ${r.lane} - ${r.time}s</div>`;
+    });
+
+    saveCompetition();
+}
+
+function saveCompetition(){
+    let historyData = JSON.parse(localStorage.getItem("competitionHistory")||"[]");
+    historyData.push({
+    event:eventName.value,
+    test:eventTest.value,
+    distance:eventDistance.value,
+    date:new Date().toLocaleString(),
+    results:results
+});
+    localStorage.setItem("competitionHistory", JSON.stringify(historyData));
+    loadHistory();
+}
+
+function loadHistory(){
+    let historyData = JSON.parse(localStorage.getItem("competitionHistory")||"[]");
+    history.innerHTML="";
+    historyData.forEach(h=>{
+        history.innerHTML+=`<div>
+${h.date} - ${h.event} | ${h.test} | ${h.distance}m
+</div>`;
     });
 }
 
@@ -151,394 +340,114 @@ function finishLane(i){
 // ===============================
 
 function saveTraining(){
-    let data=JSON.parse(localStorage.getItem("trainingData")||"[]");
-
+    let data = JSON.parse(localStorage.getItem("trainingData")||"[]");
     data.push({
-        athlete:trainingAthlete.value,
-        time:parseFloat(trainingTime.value),
-        hours:parseFloat(trainingHours.value),
-        series:parseInt(trainingSeries.value),
-        date:new Date().toLocaleDateString()
-    });
-
-    localStorage.setItem("trainingData",JSON.stringify(data));
-
-    trainingAthlete.value="";
+    athlete:trainingAthlete.value,
+    time:parseFloat(trainingTime.value),
+    hours:parseFloat(trainingHours.value),
+    series:parseInt(trainingSeries.value),
+    date:new Date().toLocaleDateString()
+});
+    localStorage.setItem("trainingData", JSON.stringify(data));
     trainingTime.value="";
-    trainingHours.value="";
-    trainingSeries.value="";
-
     loadTraining();
-    loadAthletes();
-    generatePerformanceAnalysis();
 }
 
 function loadTraining(){
-    let data=JSON.parse(localStorage.getItem("trainingData")||"[]");
+    let data = JSON.parse(localStorage.getItem("trainingData")||"[]");
     trainingHistory.innerHTML="";
     data.forEach(d=>{
-        trainingHistory.innerHTML+=
-        `<div>${d.date} - ${d.athlete} - ${d.time}ms | ${d.hours}h | ${d.series} series</div>`;
+        trainingHistory.innerHTML+=`<div>
+${d.date} - ${d.athlete} - ${d.time} ms | ${d.hours}h | ${d.series} series
+</div>`;
     });
 }
 
-function loadAthletes(){
-    let data=JSON.parse(localStorage.getItem("trainingData")||"[]");
-    let athletes=[...new Set(data.map(d=>d.athlete))];
-
-    chartAthlete.innerHTML="";
-    athletes.forEach(a=>{
-        chartAthlete.innerHTML+=`<option>${a}</option>`;
+function loadMyResults(){
+    let data = JSON.parse(localStorage.getItem("trainingData")||"[]");
+    myResults.innerHTML="";
+    data.filter(d=>d.athlete===currentUser)
+    .forEach(d=>{
+        myResults.innerHTML+=`<div>
+${d.date} - ${d.time} ms | ${d.hours}h | ${d.series} series
+</div>`;
     });
 }
-
 // ===============================
 // GRÁFICO
 // ===============================
 
+chartAthlete.addEventListener("change", updateChart);
+
 function updateChart(){
-    let athlete=chartAthlete.value;
-    let data=JSON.parse(localStorage.getItem("trainingData")||"[]")
+    let athlete = chartAthlete.value;
+    let data = JSON.parse(localStorage.getItem("trainingData")||"[]")
         .filter(d=>d.athlete===athlete);
 
-    let labels=data.map(d=>d.date);
-    let times=data.map(d=>d.time);
+    let labels = data.map(d=>d.date);
+    let times = data.map(d=>d.time);
 
     if(progressChart) progressChart.destroy();
 
-    progressChart=new Chart(document.getElementById("progressChart"),{
+    progressChart = new Chart(progressChart=document.getElementById("progressChart"),{
         type:"line",
-        data:{labels:labels,datasets:[{label:"Tiempo (ms)",data:times}]}
+        data:{
+            labels:labels,
+            datasets:[{
+                label:"Tiempo (ms)",
+                data:times
+            }]
+        }
     });
 }
 
 // ===============================
-// NIVEL 4 ANALÍTICA
+// EXPORTACIONES
 // ===============================
 
-function getCategory(bestTime){
-    if(bestTime<60000) return "Elite";
-    if(bestTime<75000) return "Avanzado";
-    if(bestTime<90000) return "Intermedio";
-    return "Principiante";
+function exportExcel(){
+    let data = JSON.parse(localStorage.getItem("trainingData")||"[]");
+    let ws = XLSX.utils.json_to_sheet(data);
+    let wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, "Entrenamiento");
+    XLSX.writeFile(wb, "Entrenamiento.xlsx");
 }
 
-function generatePerformanceAnalysis(){
-    let data=JSON.parse(localStorage.getItem("trainingData")||"[]");
-    performanceAnalysis.innerHTML="";
-    globalRanking.innerHTML="";
+async function exportFullPDF(){
+    const { jsPDF } = window.jspdf;
+    const doc = new jsPDF();
+    let data = JSON.parse(localStorage.getItem("trainingData")||"[]");
 
-    let athletes=[...new Set(data.map(d=>d.athlete))];
-    let ranking=[];
-
-    athletes.forEach(a=>{
-        let athleteData=data.filter(d=>d.athlete===a);
-        let times=athleteData.map(d=>d.time);
-
-        if(times.length===0) return;
-
-        let best=Math.min(...times);
-        let avg=(times.reduce((a,b)=>a+b,0)/times.length).toFixed(2);
-        let improvement=times.length>1?(times[0]-times[times.length-1]).toFixed(2):0;
-
-        ranking.push({name:a,best:best});
-
-        performanceAnalysis.innerHTML+=
-        `<div style="margin-bottom:8px">
-        <strong>${a}</strong><br>
-        Mejor: ${best}ms<br>
-        Promedio: ${avg}ms<br>
-        Mejora: ${improvement}ms<br>
-        Categoría: ${getCategory(best)}
-        </div>`;
-    });
-
-    ranking.sort((a,b)=>a.best-b.best);
-
-    ranking.forEach((r,i)=>{
-        globalRanking.innerHTML+=
-        `<div>${i+1}° - ${r.name} - ${r.best}ms</div>`;
-    });
-}
-
-// ===============================
-loadTraining();
-loadAthletes();
-generatePerformanceAnalysis();
-
-</script>
-
-</body>
-</html><!DOCTYPE html>
-<html lang="es">
-<head>
-<meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Sistema Competencia Elite</title>
-
-<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
-<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
-<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
-
-<style>
-body{margin:0;font-family:sans-serif;background:#0f172a;color:white;padding:15px}
-.card{background:#1f2937;padding:15px;border-radius:15px;margin-bottom:15px}
-input,select{width:100%;padding:8px;margin:5px 0;border-radius:8px;border:none}
-button{padding:8px 12px;margin:4px;border:none;border-radius:8px;font-weight:bold;cursor:pointer}
-.btn{background:#2563eb;color:white}
-.btn-danger{background:#dc2626;color:white}
-.btn-success{background:#16a34a;color:white}
-.lane{background:#111827;padding:10px;margin:8px 0;border-radius:10px;display:flex;justify-content:space-between;align-items:center}
-.lane.running{box-shadow:0 0 15px #22c55e}
-</style>
-</head>
-<body>
-
-<h2>Sistema Competencia Elite</h2>
-
-<div class="card">
-<h3>Evento</h3>
-<input type="text" id="eventName" placeholder="Nombre del evento">
-<input type="text" id="eventTest" placeholder="Nombre de la prueba (Ej: 100m Libre)">
-<input type="number" id="eventDistance" placeholder="Metros a competir">
-<input type="number" id="laneCount" min="2" max="10" value="8">
-<button class="btn-success" onclick="startCompetition()">Crear Carriles</button>
-</div>
-
-<div class="card">
-<h3>Carriles</h3>
-<div id="lanes"></div>
-</div>
-
-<div class="card">
-<h3>Ranking</h3>
-<div id="ranking"></div>
-</div>
-
-<div class="card">
-<h3>Entrenamiento</h3>
-<input type="text" id="trainingAthlete" placeholder="Nombre del atleta">
-<input type="number" id="trainingTime" placeholder="Tiempo en ms">
-<input type="number" id="trainingHours" placeholder="Horas entrenadas">
-<input type="number" id="trainingSeries" placeholder="Series realizadas">
-<button class="btn" onclick="saveTraining()">Guardar</button>
-</div>
-
-<div class="card">
-<h3>Historial Entrenamiento</h3>
-<div id="trainingHistory"></div>
-</div>
-
-<div class="card">
-<h3>Gráfico</h3>
-<select id="chartAthlete" onchange="updateChart()"></select>
-<canvas id="progressChart"></canvas>
-</div>
-
-<div class="card">
-<h3>Análisis</h3>
-<div id="performanceAnalysis"></div>
-</div>
-
-<div class="card">
-<h3>Ranking General</h3>
-<div id="globalRanking"></div>
-</div>
-
-<script>
-
-// ===============================
-// VARIABLES
-// ===============================
-
-let lanesData = {};
-let results = [];
-let progressChart = null;
-
-// ===============================
-// CREAR CARRILES
-// ===============================
-
-function startCompetition(){
-    lanes.innerHTML="";
-    results=[];
-    lanesData={};
-    let count=parseInt(laneCount.value);
-
-    for(let i=1;i<=count;i++){
-        lanesData[i]={start:0,elapsed:0,interval:null,running:false};
-
-        lanes.innerHTML+=`
-        <div class="lane" id="lane${i}">
-        <span>Carril ${i}</span>
-        <div>
-        <button class="btn" onclick="startLane(${i})">▶</button>
-        <button class="btn" onclick="pauseLane(${i})">⏸</button>
-        <button class="btn-success" onclick="finishLane(${i})">🏁</button>
-        <span id="time${i}">0.000</span>
-        </div>
-        </div>`;
-    }
-}
-
-// ===============================
-// CONTROL INDIVIDUAL POR CARRIL
-// ===============================
-
-function startLane(i){
-    if(lanesData[i].running) return;
-
-    lanesData[i].running=true;
-    lanesData[i].start=Date.now()-lanesData[i].elapsed;
-
-    lanesData[i].interval=setInterval(()=>{
-        lanesData[i].elapsed=Date.now()-lanesData[i].start;
-        document.getElementById("time"+i).innerText=
-        (lanesData[i].elapsed/1000).toFixed(3);
-    },10);
-}
-
-function pauseLane(i){
-    clearInterval(lanesData[i].interval);
-    lanesData[i].running=false;
-}
-
-function finishLane(i){
-    clearInterval(lanesData[i].interval);
-    lanesData[i].running=false;
-
-    let finalTime=(lanesData[i].elapsed/1000);
-    results.push({lane:i,time:finalTime});
-    results.sort((a,b)=>a.time-b.time);
-
-    ranking.innerHTML="";
-    results.forEach((r,index)=>{
-        ranking.innerHTML+=`<div>${index+1}° - Carril ${r.lane} - ${r.time.toFixed(3)}s</div>`;
-    });
-}
-
-// ===============================
-// ENTRENAMIENTO
-// ===============================
-
-function saveTraining(){
-    let data=JSON.parse(localStorage.getItem("trainingData")||"[]");
-
-    data.push({
-        athlete:trainingAthlete.value,
-        time:parseFloat(trainingTime.value),
-        hours:parseFloat(trainingHours.value),
-        series:parseInt(trainingSeries.value),
-        date:new Date().toLocaleDateString()
-    });
-
-    localStorage.setItem("trainingData",JSON.stringify(data));
-
-    trainingAthlete.value="";
-    trainingTime.value="";
-    trainingHours.value="";
-    trainingSeries.value="";
-
-    loadTraining();
-    loadAthletes();
-    generatePerformanceAnalysis();
-}
-
-function loadTraining(){
-    let data=JSON.parse(localStorage.getItem("trainingData")||"[]");
-    trainingHistory.innerHTML="";
+    doc.text("Reporte Academia",20,20);
+    let y=30;
     data.forEach(d=>{
-        trainingHistory.innerHTML+=
-        `<div>${d.date} - ${d.athlete} - ${d.time}ms | ${d.hours}h | ${d.series} series</div>`;
+        doc.text(`${d.date} - ${d.athlete} - ${d.time} ms`,20,y);
+        y+=8;
     });
+
+    doc.save("Reporte_Academia.pdf");
 }
 
-function loadAthletes(){
-    let data=JSON.parse(localStorage.getItem("trainingData")||"[]");
-    let athletes=[...new Set(data.map(d=>d.athlete))];
-
-    chartAthlete.innerHTML="";
-    athletes.forEach(a=>{
-        chartAthlete.innerHTML+=`<option>${a}</option>`;
-    });
-}
-
-// ===============================
-// GRÁFICO
-// ===============================
-
-function updateChart(){
-    let athlete=chartAthlete.value;
-    let data=JSON.parse(localStorage.getItem("trainingData")||"[]")
+async function exportAthletePDF(){
+    const { jsPDF } = window.jspdf;
+    const doc = new jsPDF();
+    let athlete = chartAthlete.value;
+    let data = JSON.parse(localStorage.getItem("trainingData")||"[]")
         .filter(d=>d.athlete===athlete);
 
-    let labels=data.map(d=>d.date);
-    let times=data.map(d=>d.time);
-
-    if(progressChart) progressChart.destroy();
-
-    progressChart=new Chart(document.getElementById("progressChart"),{
-        type:"line",
-        data:{labels:labels,datasets:[{label:"Tiempo (ms)",data:times}]}
-    });
-}
-
-// ===============================
-// NIVEL 4 ANALÍTICA
-// ===============================
-
-function getCategory(bestTime){
-    if(bestTime<60000) return "Elite";
-    if(bestTime<75000) return "Avanzado";
-    if(bestTime<90000) return "Intermedio";
-    return "Principiante";
-}
-
-function generatePerformanceAnalysis(){
-    let data=JSON.parse(localStorage.getItem("trainingData")||"[]");
-    performanceAnalysis.innerHTML="";
-    globalRanking.innerHTML="";
-
-    let athletes=[...new Set(data.map(d=>d.athlete))];
-    let ranking=[];
-
-    athletes.forEach(a=>{
-        let athleteData=data.filter(d=>d.athlete===a);
-        let times=athleteData.map(d=>d.time);
-
-        if(times.length===0) return;
-
-        let best=Math.min(...times);
-        let avg=(times.reduce((a,b)=>a+b,0)/times.length).toFixed(2);
-        let improvement=times.length>1?(times[0]-times[times.length-1]).toFixed(2):0;
-
-        ranking.push({name:a,best:best});
-
-        performanceAnalysis.innerHTML+=
-        `<div style="margin-bottom:8px">
-        <strong>${a}</strong><br>
-        Mejor: ${best}ms<br>
-        Promedio: ${avg}ms<br>
-        Mejora: ${improvement}ms<br>
-        Categoría: ${getCategory(best)}
-        </div>`;
+    doc.text("Reporte Individual",20,20);
+    let y=30;
+    data.forEach(d=>{
+        doc.text(`${d.date} - ${d.time} ms`,20,y);
+        y+=8;
     });
 
-    ranking.sort((a,b)=>a.best-b.best);
-
-    ranking.forEach((r,i)=>{
-        globalRanking.innerHTML+=
-        `<div>${i+1}° - ${r.name} - ${r.best}ms</div>`;
-    });
+    doc.save(`Reporte_${athlete}.pdf`);
 }
 
 // ===============================
 loadTraining();
-loadAthletes();
-generatePerformanceAnalysis();
-
+loadHistory();
 </script>
-
 </body>
 </html>
-

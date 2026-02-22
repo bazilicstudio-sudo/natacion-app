@@ -3,19 +3,19 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>🏊 Control Natación</title>
+<title>🏊 Control Natación PRO</title>
 
 <link rel="manifest" href="manifest.json">
 <meta name="theme-color" content="#0d6efd">
 
-<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.js"></script>
 
 <style>
 body {
     font-family: Arial, sans-serif;
     margin: 0;
     padding: 20px;
-    background: #f4f6f9;
+    background: #eef2f7;
 }
 
 h1 {
@@ -36,7 +36,7 @@ button.danger {
     background: red;
 }
 
-input {
+input, select {
     padding: 8px;
     margin: 5px 0;
     width: 100%;
@@ -47,12 +47,14 @@ input {
     padding: 15px;
     margin-bottom: 15px;
     border-radius: 10px;
+    box-shadow: 0 3px 10px rgba(0,0,0,0.1);
 }
 
 #timer {
-    font-size: 2rem;
+    font-size: 2.5rem;
     text-align: center;
-    margin: 15px 0;
+    margin: 20px 0;
+    font-weight: bold;
 }
 
 canvas {
@@ -72,10 +74,11 @@ canvas {
 </div>
 
 <div class="card">
-    <h3>Cronómetro</h3>
+    <h3>Cronómetro Profesional</h3>
     <div id="timer">00:00.000</div>
     <button onclick="startTimer()">Iniciar</button>
     <button onclick="stopTimer()">Detener</button>
+    <button onclick="resetTimer()">Reiniciar</button>
     <button onclick="saveTime()">Guardar Tiempo</button>
 </div>
 
@@ -86,68 +89,84 @@ canvas {
 </div>
 
 <div class="card">
-    <h3>Gráfico de Progreso</h3>
+    <h3>Progreso por Atleta</h3>
     <canvas id="progressChart"></canvas>
 </div>
 
 <script>
 let athletes = JSON.parse(localStorage.getItem("athletes")) || [];
-let timerInterval;
-let milliseconds = 0;
 let chart;
+
+let startTime = 0;
+let elapsedTime = 0;
+let timerInterval = null;
+let running = false;
 
 function formatTime(ms) {
     let minutes = Math.floor(ms / 60000);
     let seconds = Math.floor((ms % 60000) / 1000);
-    let mil = ms % 1000;
+    let mil = Math.floor(ms % 1000);
 
-    return 
+    return (
         String(minutes).padStart(2,'0') + ":" +
         String(seconds).padStart(2,'0') + "." +
-        String(mil).padStart(3,'0');
+        String(mil).padStart(3,'0')
+    );
 }
 
 function startTimer() {
-    clearInterval(timerInterval);
+    if (running) return;
+
+    running = true;
+    startTime = performance.now() - elapsedTime;
+
     timerInterval = setInterval(() => {
-        milliseconds += 10;
-        document.getElementById("timer").innerText = formatTime(milliseconds);
+        elapsedTime = performance.now() - startTime;
+        document.getElementById("timer").innerText = formatTime(elapsedTime);
     }, 10);
 }
 
 function stopTimer() {
+    running = false;
     clearInterval(timerInterval);
+}
+
+function resetTimer() {
+    running = false;
+    clearInterval(timerInterval);
+    elapsedTime = 0;
+    document.getElementById("timer").innerText = "00:00.000";
 }
 
 function saveTime() {
     let select = document.getElementById("athleteSelect");
     let name = select.value;
-    if(!name) return alert("Selecciona un atleta");
+
+    if (!name) return alert("Selecciona un atleta");
 
     let athlete = athletes.find(a => a.name === name);
+
     athlete.times.push({
-        time: milliseconds,
+        time: Math.floor(elapsedTime),
         obs: document.getElementById("observation").value
     });
 
-    milliseconds = 0;
-    document.getElementById("timer").innerText = "00:00.000";
-    document.getElementById("observation").value = "";
-
     saveData();
     updateChart();
+    resetTimer();
+    document.getElementById("observation").value = "";
 }
 
 function addAthlete() {
     let name = document.getElementById("athleteName").value;
-    if(!name) return;
+    if (!name) return;
 
-    let colors = ["red","blue","green","orange","purple","brown"];
+    let colors = ["red","blue","green","orange","purple","brown","black"];
     let color = colors[athletes.length % colors.length];
 
     athletes.push({ name, times: [], color });
-    document.getElementById("athleteName").value = "";
 
+    document.getElementById("athleteName").value = "";
     saveData();
     updateSelect();
     updateChart();
@@ -171,18 +190,25 @@ function saveData() {
 function updateChart() {
     let ctx = document.getElementById("progressChart").getContext("2d");
 
-    if(chart) chart.destroy();
+    if (chart) chart.destroy();
 
     chart = new Chart(ctx, {
         type: "line",
         data: {
-            labels: athletes[0]?.times.map((_,i)=> "Intento " + (i+1)) || [],
+            labels: Array.from({length: 20}, (_, i) => "Intento " + (i+1)),
             datasets: athletes.map(a => ({
                 label: a.name,
-                data: a.times.map(t => t.time/1000),
+                data: a.times.map(t => t.time / 1000),
                 borderColor: a.color,
+                tension: 0,
                 fill: false
             }))
+        },
+        options: {
+            responsive: true,
+            plugins: {
+                legend: { position: 'top' }
+            }
         }
     });
 }

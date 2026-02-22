@@ -3,262 +3,171 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>🏊 Natación Elite PRO</title>
+<title>🏊 Sistema Competencia PRO</title>
 
 <link rel="manifest" href="manifest.json">
 <meta name="theme-color" content="#111827">
 
-<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.js"></script>
-
 <style>
-body {
-    margin:0;
-    font-family: 'Segoe UI', sans-serif;
-    background: linear-gradient(180deg,#0f172a,#111827);
-    color:white;
-    padding:15px;
-}
-
-h1 {
-    text-align:center;
-    font-size:22px;
-    margin-bottom:20px;
-}
-
-.card {
-    background:#1f2937;
-    padding:15px;
-    border-radius:15px;
-    margin-bottom:15px;
-    box-shadow:0 4px 20px rgba(0,0,0,0.5);
-}
-
-button {
-    padding:10px;
-    margin:5px 3px;
-    border:none;
-    border-radius:10px;
-    font-weight:bold;
-    cursor:pointer;
-}
-
-.btn-primary { background:#2563eb; color:white; }
-.btn-danger { background:#dc2626; color:white; }
-.btn-success { background:#16a34a; color:white; }
-.btn-warning { background:#f59e0b; color:black; }
-
-input, select {
-    width:100%;
-    padding:10px;
-    margin:5px 0;
-    border-radius:10px;
-    border:none;
-}
-
-#timer {
-    font-size:3rem;
-    text-align:center;
-    font-weight:bold;
-    letter-spacing:2px;
-    margin:20px 0;
-}
-
-.running {
-    color:#22c55e;
-    animation:pulse 1s infinite;
-}
-
-@keyframes pulse {
-    0% { opacity:1; }
-    50% { opacity:0.6; }
-    100% { opacity:1; }
-}
-
-table {
-    width:100%;
-    border-collapse:collapse;
-    font-size:13px;
-}
-
-th, td {
-    border:1px solid #374151;
-    padding:6px;
-    text-align:center;
-}
-
-th {
-    background:#2563eb;
-}
-
-.ranking {
-    font-size:14px;
-    margin-bottom:10px;
-}
-
-.medal {
-    font-size:18px;
-}
+body{margin:0;font-family:sans-serif;background:#0f172a;color:white;padding:15px}
+.card{background:#1f2937;padding:15px;border-radius:15px;margin-bottom:15px}
+input,select{width:100%;padding:8px;margin:5px 0;border-radius:8px;border:none}
+button{padding:8px 12px;margin:3px;border:none;border-radius:8px;font-weight:bold;cursor:pointer}
+.btn{background:#2563eb;color:white}
+.btn-danger{background:#dc2626;color:white}
+#timer{font-size:2rem;text-align:center;margin:10px 0}
+.lane{background:#111827;padding:10px;margin:5px 0;border-radius:10px}
+.running{color:#22c55e}
+.hidden{display:none}
 </style>
 </head>
 <body>
 
-<h1>🏊 Natación Elite PRO</h1>
+<h2>🏊 Sistema Competencia PRO</h2>
 
-<div class="card">
-<h3>Agregar Atleta</h3>
-<input type="text" id="athleteName" placeholder="Nombre del atleta">
-<button class="btn-primary" onclick="addAthlete()">Agregar</button>
+<div id="loginCard" class="card">
+<h3>Login</h3>
+<select id="role">
+<option value="coach">Entrenador</option>
+<option value="athlete">Atleta</option>
+</select>
+<input type="text" id="username" placeholder="Nombre">
+<button class="btn" onclick="login()">Ingresar</button>
 </div>
 
-<div class="card">
-<h3>Cronómetro Competencia</h3>
-<div id="timer">00:00.000</div>
-<button class="btn-success" onclick="startTimer()">Iniciar</button>
-<button class="btn-warning" onclick="stopTimer()">Detener</button>
-<button class="btn-danger" onclick="resetTimer()">Reiniciar</button>
-<button class="btn-primary" onclick="saveTime()">Guardar</button>
-</div>
+<div id="app" class="hidden">
 
 <div class="card">
-<h3>Seleccionar Atleta</h3>
-<select id="athleteSelect"></select>
-<input type="text" id="observation" placeholder="Observación">
+<button class="btn-danger" onclick="logout()">Cerrar Sesión</button>
 </div>
 
-<div class="card">
-<h3>Ranking General 🏆</h3>
-<div id="ranking"></div>
+<div id="coachPanel" class="card hidden">
+<h3>Modo Competencia (6 Carriles)</h3>
+<button class="btn" onclick="startCompetition()">Iniciar Competencia</button>
+<div id="lanes"></div>
+<h3>Ranking en Vivo</h3>
+<div id="liveRanking"></div>
 </div>
 
-<div class="card">
-<h3>Progreso</h3>
-<canvas id="progressChart"></canvas>
+<div id="athletePanel" class="card hidden">
+<h3>Mi Mejor Tiempo</h3>
+<div id="myStats"></div>
+</div>
+
 </div>
 
 <script>
-let athletes = JSON.parse(localStorage.getItem("athletes")) || [];
-let chart;
-let startTime=0, elapsedTime=0, timerInterval=null, running=false;
+let session=JSON.parse(localStorage.getItem("session"))||null;
+let athletes=JSON.parse(localStorage.getItem("athletes"))||[];
+let lanes=[];
+let competitionRunning=false;
 
-function formatTime(ms){
+function saveData(){
+localStorage.setItem("athletes",JSON.stringify(athletes));
+}
+
+function login(){
+let role=document.getElementById("role").value;
+let name=document.getElementById("username").value;
+if(!name)return alert("Escribe nombre");
+session={role,name};
+localStorage.setItem("session",JSON.stringify(session));
+initApp();
+}
+
+function logout(){
+localStorage.removeItem("session");
+location.reload();
+}
+
+function initApp(){
+if(!session)return;
+document.getElementById("loginCard").classList.add("hidden");
+document.getElementById("app").classList.remove("hidden");
+
+if(session.role==="coach"){
+document.getElementById("coachPanel").classList.remove("hidden");
+initLanes();
+}else{
+document.getElementById("athletePanel").classList.remove("hidden");
+showAthleteStats();
+}
+}
+
+function initLanes(){
+let container=document.getElementById("lanes");
+container.innerHTML="";
+lanes=[];
+for(let i=1;i<=6;i++){
+lanes.push({lane:i,time:0,start:0,interval:null,finished:false});
+container.innerHTML+=`
+<div class="lane" id="lane${i}">
+Carril ${i} - <span id="time${i}">00:00.000</span>
+<button onclick="stopLane(${i})">Detener</button>
+</div>`;
+}
+}
+
+function format(ms){
 let m=Math.floor(ms/60000);
 let s=Math.floor((ms%60000)/1000);
 let mil=Math.floor(ms%1000);
 return String(m).padStart(2,'0')+":"+String(s).padStart(2,'0')+"."+String(mil).padStart(3,'0');
 }
 
-function startTimer(){
-if(running) return;
-running=true;
-document.getElementById("timer").classList.add("running");
-startTime=performance.now()-elapsedTime;
-timerInterval=setInterval(()=>{
-elapsedTime=performance.now()-startTime;
-document.getElementById("timer").innerText=formatTime(elapsedTime);
+function startCompetition(){
+competitionRunning=true;
+lanes.forEach(l=>{
+l.start=performance.now();
+l.interval=setInterval(()=>{
+l.time=performance.now()-l.start;
+document.getElementById("time"+l.lane).innerText=format(l.time);
 },10);
-}
-
-function stopTimer(){
-running=false;
-clearInterval(timerInterval);
-document.getElementById("timer").classList.remove("running");
-}
-
-function resetTimer(){
-running=false;
-clearInterval(timerInterval);
-elapsedTime=0;
-document.getElementById("timer").innerText="00:00.000";
-document.getElementById("timer").classList.remove("running");
-}
-
-function saveTime(){
-let name=document.getElementById("athleteSelect").value;
-if(!name) return alert("Selecciona atleta");
-let athlete=athletes.find(a=>a.name===name);
-athlete.times.push({time:Math.floor(elapsedTime),obs:document.getElementById("observation").value});
-resetTimer();
-document.getElementById("observation").value="";
-saveData();
-updateAll();
-}
-
-function addAthlete(){
-let name=document.getElementById("athleteName").value;
-if(!name) return;
-let colors=["#ef4444","#3b82f6","#22c55e","#f59e0b","#a855f7","#14b8a6"];
-athletes.push({name,times:[],color:colors[athletes.length%colors.length]});
-document.getElementById("athleteName").value="";
-saveData();
-updateAll();
-}
-
-function saveData(){
-localStorage.setItem("athletes",JSON.stringify(athletes));
-}
-
-function updateSelect(){
-let select=document.getElementById("athleteSelect");
-select.innerHTML="";
-athletes.forEach(a=>{
-let option=document.createElement("option");
-option.value=a.name;
-option.textContent=a.name;
-select.appendChild(option);
 });
 }
 
-function updateRanking(){
-let div=document.getElementById("ranking");
-let ranking=athletes
-.map(a=>{
-let best=Math.min(...a.times.map(t=>t.time),Infinity);
-return {name:a.name,best};
-})
-.filter(a=>a.best!==Infinity)
-.sort((a,b)=>a.best-b.best);
+function stopLane(num){
+let lane=lanes.find(l=>l.lane===num);
+if(lane.finished)return;
+clearInterval(lane.interval);
+lane.finished=true;
+saveLaneResult(lane.time);
+updateLiveRanking();
+}
 
+function saveLaneResult(time){
+let athlete=athletes.find(a=>a.name===session.name);
+if(!athlete){
+athlete={name:session.name,times:[]};
+athletes.push(athlete);
+}
+athlete.times.push({time});
+saveData();
+}
+
+function updateLiveRanking(){
+let ranking=lanes.filter(l=>l.finished).sort((a,b)=>a.time-b.time);
 let medals=["🥇","🥈","🥉"];
 let html="";
-ranking.forEach((a,i)=>{
-html+=`<div class="ranking">${medals[i]||""} ${a.name} - ${formatTime(a.best)}</div>`;
+ranking.forEach((l,i)=>{
+html+=`${medals[i]||""} Carril ${l.lane} - ${format(l.time)}<br>`;
 });
-div.innerHTML=html||"Sin tiempos registrados";
+document.getElementById("liveRanking").innerHTML=html;
 }
 
-function updateChart(){
-let ctx=document.getElementById("progressChart").getContext("2d");
-if(chart) chart.destroy();
-chart=new Chart(ctx,{
-type:"line",
-data:{
-labels:Array.from({length:20},(_,i)=>"Intento "+(i+1)),
-datasets:athletes.map(a=>({
-label:a.name,
-data:a.times.map(t=>t.time/1000),
-borderColor:a.color,
-tension:0,
-fill:false
-}))
-},
-options:{responsive:true}
-});
+function showAthleteStats(){
+let athlete=athletes.find(a=>a.name===session.name);
+if(!athlete||athlete.times.length===0){
+document.getElementById("myStats").innerText="Sin tiempos";
+return;
+}
+let best=Math.min(...athlete.times.map(t=>t.time));
+document.getElementById("myStats").innerText="Mejor Tiempo: "+format(best);
 }
 
-function updateAll(){
-updateSelect();
-updateRanking();
-updateChart();
-}
-
-updateAll();
-
-if('serviceWorker' in navigator){
-navigator.serviceWorker.register('service-worker.js');
-}
+initApp();
 </script>
 
 </body>
 </html>
-
 

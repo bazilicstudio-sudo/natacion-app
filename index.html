@@ -3,27 +3,44 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>🏊 Sistema Competencia PRO</title>
-
-<link rel="manifest" href="manifest.json">
-<meta name="theme-color" content="#111827">
-
+<title>🏊 Sistema Competencia Elite</title>
 <style>
 body{margin:0;font-family:sans-serif;background:#0f172a;color:white;padding:15px}
 .card{background:#1f2937;padding:15px;border-radius:15px;margin-bottom:15px}
 input,select{width:100%;padding:8px;margin:5px 0;border-radius:8px;border:none}
-button{padding:8px 12px;margin:3px;border:none;border-radius:8px;font-weight:bold;cursor:pointer}
+button{padding:8px 12px;margin:4px;border:none;border-radius:8px;font-weight:bold;cursor:pointer}
 .btn{background:#2563eb;color:white}
 .btn-danger{background:#dc2626;color:white}
-#timer{font-size:2rem;text-align:center;margin:10px 0}
-.lane{background:#111827;padding:10px;margin:5px 0;border-radius:10px}
-.running{color:#22c55e}
+.btn-success{background:#16a34a;color:white}
 .hidden{display:none}
+.lane{
+background:#111827;
+padding:10px;
+margin:8px 0;
+border-radius:10px;
+display:flex;
+justify-content:space-between;
+align-items:center;
+transition:0.3s;
+}
+.lane.running{
+box-shadow:0 0 15px #22c55e;
+animation:pulse 1s infinite;
+}
+.lane.finished{
+background:#1e293b;
+}
+@keyframes pulse{
+0%{opacity:1}
+50%{opacity:0.6}
+100%{opacity:1}
+}
+.ranking{margin-top:10px;font-size:14px}
 </style>
 </head>
 <body>
 
-<h2>🏊 Sistema Competencia PRO</h2>
+<h2>🏊 Sistema Competencia Elite</h2>
 
 <div id="loginCard" class="card">
 <h3>Login</h3>
@@ -41,17 +58,42 @@ button{padding:8px 12px;margin:3px;border:none;border-radius:8px;font-weight:bol
 <button class="btn-danger" onclick="logout()">Cerrar Sesión</button>
 </div>
 
-<div id="coachPanel" class="card hidden">
-<h3>Modo Competencia (6 Carriles)</h3>
-<button class="btn" onclick="startCompetition()">Iniciar Competencia</button>
-<div id="lanes"></div>
-<h3>Ranking en Vivo</h3>
-<div id="liveRanking"></div>
+<div id="coachPanel" class="hidden">
+
+<div class="card">
+<h3>Crear Atleta</h3>
+<input type="text" id="newAthlete">
+<button class="btn" onclick="createAthlete()">Crear</button>
 </div>
 
-<div id="athletePanel" class="card hidden">
-<h3>Mi Mejor Tiempo</h3>
-<div id="myStats"></div>
+<div class="card">
+<h3>Evento</h3>
+<input type="text" id="eventName" placeholder="Nombre del evento">
+<button class="btn-success" onclick="startCompetition()">Iniciar Competencia</button>
+</div>
+
+<div class="card">
+<h3>8 Carriles</h3>
+<div id="lanes"></div>
+</div>
+
+<div class="card">
+<h3>Ranking</h3>
+<div id="ranking"></div>
+</div>
+
+<div class="card">
+<h3>Historial</h3>
+<div id="history"></div>
+</div>
+
+</div>
+
+<div id="athletePanel" class="hidden">
+<div class="card">
+<h3>Mis Resultados</h3>
+<div id="myResults"></div>
+</div>
 </div>
 
 </div>
@@ -59,11 +101,16 @@ button{padding:8px 12px;margin:3px;border:none;border-radius:8px;font-weight:bol
 <script>
 let session=JSON.parse(localStorage.getItem("session"))||null;
 let athletes=JSON.parse(localStorage.getItem("athletes"))||[];
+let competitions=JSON.parse(localStorage.getItem("competitions"))||[];
 let lanes=[];
-let competitionRunning=false;
+let audioCtx=new(window.AudioContext||window.webkitAudioContext)();
 
-function saveData(){
-localStorage.setItem("athletes",JSON.stringify(athletes));
+function beep(freq,duration){
+let osc=audioCtx.createOscillator();
+osc.frequency.value=freq;
+osc.connect(audioCtx.destination);
+osc.start();
+setTimeout(()=>osc.stop(),duration);
 }
 
 function login(){
@@ -72,7 +119,7 @@ let name=document.getElementById("username").value;
 if(!name)return alert("Escribe nombre");
 session={role,name};
 localStorage.setItem("session",JSON.stringify(session));
-initApp();
+init();
 }
 
 function logout(){
@@ -80,7 +127,17 @@ localStorage.removeItem("session");
 location.reload();
 }
 
-function initApp(){
+function createAthlete(){
+let name=document.getElementById("newAthlete").value;
+if(!name)return;
+athletes.push({name});
+localStorage.setItem("athletes",JSON.stringify(athletes));
+document.getElementById("newAthlete").value="";
+alert("Atleta creado");
+initLanes();
+}
+
+function init(){
 if(!session)return;
 document.getElementById("loginCard").classList.add("hidden");
 document.getElementById("app").classList.remove("hidden");
@@ -88,9 +145,10 @@ document.getElementById("app").classList.remove("hidden");
 if(session.role==="coach"){
 document.getElementById("coachPanel").classList.remove("hidden");
 initLanes();
+showHistory();
 }else{
 document.getElementById("athletePanel").classList.remove("hidden");
-showAthleteStats();
+showAthleteResults();
 }
 }
 
@@ -98,12 +156,22 @@ function initLanes(){
 let container=document.getElementById("lanes");
 container.innerHTML="";
 lanes=[];
-for(let i=1;i<=6;i++){
-lanes.push({lane:i,time:0,start:0,interval:null,finished:false});
+for(let i=1;i<=8;i++){
+lanes.push({lane:i,time:0,start:0,interval:null,finished:false,athlete:null});
+let options=athletes.map(a=>`<option>${a.name}</option>`).join("");
 container.innerHTML+=`
 <div class="lane" id="lane${i}">
-Carril ${i} - <span id="time${i}">00:00.000</span>
+<div>
+Carril ${i}
+<select id="athlete${i}">
+<option value="">Asignar atleta</option>
+${options}
+</select>
+</div>
+<div>
+<span id="time${i}">00:00.000</span>
 <button onclick="stopLane(${i})">Detener</button>
+</div>
 </div>`;
 }
 }
@@ -116,9 +184,14 @@ return String(m).padStart(2,'0')+":"+String(s).padStart(2,'0')+"."+String(mil).p
 }
 
 function startCompetition(){
-competitionRunning=true;
+beep(800,300);
+let event=document.getElementById("eventName").value||"Evento sin nombre";
 lanes.forEach(l=>{
+let athlete=document.getElementById("athlete"+l.lane).value;
+l.athlete=athlete;
 l.start=performance.now();
+l.finished=false;
+document.getElementById("lane"+l.lane).classList.add("running");
 l.interval=setInterval(()=>{
 l.time=performance.now()-l.start;
 document.getElementById("time"+l.lane).innerText=format(l.time);
@@ -131,41 +204,65 @@ let lane=lanes.find(l=>l.lane===num);
 if(lane.finished)return;
 clearInterval(lane.interval);
 lane.finished=true;
-saveLaneResult(lane.time);
-updateLiveRanking();
+document.getElementById("lane"+num).classList.remove("running");
+document.getElementById("lane"+num).classList.add("finished");
+beep(400,200);
+updateRanking();
+checkEnd();
 }
 
-function saveLaneResult(time){
-let athlete=athletes.find(a=>a.name===session.name);
-if(!athlete){
-athlete={name:session.name,times:[]};
-athletes.push(athlete);
-}
-athlete.times.push({time});
-saveData();
-}
-
-function updateLiveRanking(){
-let ranking=lanes.filter(l=>l.finished).sort((a,b)=>a.time-b.time);
+function updateRanking(){
+let ranking=lanes.filter(l=>l.finished&&l.athlete).sort((a,b)=>a.time-b.time);
 let medals=["🥇","🥈","🥉"];
 let html="";
 ranking.forEach((l,i)=>{
-html+=`${medals[i]||""} Carril ${l.lane} - ${format(l.time)}<br>`;
+html+=`${medals[i]||""} ${l.athlete} - ${format(l.time)}<br>`;
 });
-document.getElementById("liveRanking").innerHTML=html;
+document.getElementById("ranking").innerHTML=html;
 }
 
-function showAthleteStats(){
-let athlete=athletes.find(a=>a.name===session.name);
-if(!athlete||athlete.times.length===0){
-document.getElementById("myStats").innerText="Sin tiempos";
-return;
+function checkEnd(){
+if(lanes.every(l=>l.finished)){
+saveCompetition();
+beep(1000,500);
 }
-let best=Math.min(...athlete.times.map(t=>t.time));
-document.getElementById("myStats").innerText="Mejor Tiempo: "+format(best);
 }
 
-initApp();
+function saveCompetition(){
+let event=document.getElementById("eventName").value||"Evento";
+let results=lanes.filter(l=>l.athlete).map(l=>({athlete:l.athlete,time:l.time}));
+competitions.push({event,date:new Date().toLocaleString(),results});
+localStorage.setItem("competitions",JSON.stringify(competitions));
+showHistory();
+}
+
+function showHistory(){
+let div=document.getElementById("history");
+let html="";
+competitions.forEach(c=>{
+html+=`<strong>${c.event}</strong> - ${c.date}<br>`;
+c.results.forEach(r=>{
+html+=`${r.athlete} - ${format(r.time)}<br>`;
+});
+html+="<hr>";
+});
+div.innerHTML=html;
+}
+
+function showAthleteResults(){
+let div=document.getElementById("myResults");
+let html="";
+competitions.forEach(c=>{
+c.results.forEach(r=>{
+if(r.athlete===session.name){
+html+=`${c.event} - ${format(r.time)}<br>`;
+}
+});
+});
+div.innerHTML=html||"Sin resultados";
+}
+
+init();
 </script>
 
 </body>

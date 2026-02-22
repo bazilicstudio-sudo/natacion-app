@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Sistema Competencia Elite</title>
+<title>Sistema Competencia Elite PRO</title>
 
 <style>
 body{
@@ -15,9 +15,9 @@ padding:10px;
 }
 .card{
 background:#1f2937;
-padding:12px;
+padding:15px;
 border-radius:15px;
-margin-bottom:12px;
+margin-bottom:15px;
 }
 button{
 padding:12px;
@@ -41,35 +41,44 @@ text-align:center;
 }
 .lane.finished{background:#1e293b;}
 .timeDisplay{
-font-size:28px;
+font-size:26px;
 font-weight:bold;
 margin:10px 0;
 }
 .hidden{display:none}
-select,input{
+input,select{
 width:100%;
 padding:8px;
 margin:5px 0;
 border-radius:8px;
 border:none;
 }
+img{
+max-width:100px;
+border-radius:50%;
+margin-top:10px;
+}
+.medal{
+font-size:22px;
+}
 </style>
 </head>
 <body>
 
-<h2>🏊 Sistema Competencia Elite</h2>
+<h2>🏊 Sistema Competencia Elite PRO</h2>
 
-<div id="setupCard" class="card hidden">
-<h3>Crear Administrador</h3>
-<input type="text" id="adminUser" placeholder="Usuario Admin">
-<input type="password" id="adminPass" placeholder="Contraseña">
-<button class="btn-success" onclick="createAdmin()">Crear Cuenta</button>
-</div>
+<!-- LOGIN -->
+<div id="loginCard" class="card">
+<h3>Iniciar Sesión</h3>
 
-<div id="loginCard" class="card hidden">
-<h3>Login</h3>
+<select id="roleSelect">
+<option value="admin">Entrenador</option>
+<option value="athlete">Atleta</option>
+</select>
+
 <input type="text" id="loginUser" placeholder="Usuario">
 <input type="password" id="loginPass" placeholder="Contraseña">
+
 <button class="btn" onclick="login()">Ingresar</button>
 </div>
 
@@ -79,46 +88,12 @@ border:none;
 <button class="btn-danger" onclick="logout()">Cerrar Sesión</button>
 </div>
 
-<div id="adminNav" class="card hidden">
-<button class="btn" onclick="showSection('competition')">Competencia</button>
-<button class="btn" onclick="showSection('admin')">Administración</button>
-</div>
-
-<div id="athleteNav" class="card hidden">
-<h3>Panel Atleta</h3>
-<div id="athleteInfoPanel"></div>
-<button class="btn" onclick="downloadMyResults()">Descargar Mis Resultados</button>
-</div>
-
-<!-- COMPETENCIA -->
-<div id="competitionSection" class="hidden">
-<div class="card">
-<input type="number" id="laneCount" min="2" max="10" value="4">
-<button class="btn-success" onclick="startCompetition()">Crear Carriles</button>
-</div>
-
-<div class="card">
-<button class="btn-danger" onclick="prepareStart()">🚦 PREPARADOS</button>
-<div id="startSignal"></div>
-</div>
-
-<div class="card">
-<div id="lanes"></div>
-</div>
-
-<div class="card">
-<h3>Ranking</h3>
-<div id="ranking"></div>
-<button class="btn" onclick="downloadResults()">Descargar Resultados</button>
-</div>
-</div>
-
-<!-- ADMIN -->
-<div id="adminSection" class="hidden">
+<!-- PANEL ADMIN -->
+<div id="adminPanel" class="hidden">
 
 <div class="card">
 <h3>Crear Atleta</h3>
-<input type="text" id="newAthlete" placeholder="Nombre">
+<input type="text" id="newAthlete" placeholder="Usuario">
 <input type="password" id="newPass" placeholder="Contraseña">
 <input type="number" id="newAge" placeholder="Edad">
 <select id="newGender">
@@ -127,7 +102,7 @@ border:none;
 <option value="Femenino">Femenino</option>
 </select>
 <input type="text" id="newCategory" placeholder="Categoría">
-<button class="btn" onclick="createAthlete()">Crear</button>
+<button class="btn-success" onclick="createAthlete()">Crear Atleta</button>
 </div>
 
 <div class="card">
@@ -137,6 +112,39 @@ border:none;
 </div>
 
 </div>
+
+<!-- PANEL ATLETA -->
+<div id="athletePanel" class="hidden">
+
+<div class="card">
+<h3>Mi Perfil</h3>
+<div id="profileInfo"></div>
+
+<input type="file" id="photoInput">
+<input type="text" id="editPhone" placeholder="Teléfono">
+<input type="email" id="editEmail" placeholder="Correo">
+
+<button class="btn-success" onclick="saveProfile()">Guardar Cambios</button>
+<button class="btn" onclick="downloadMyResults()">Descargar Mis Resultados</button>
+</div>
+
+</div>
+
+<!-- COMPETENCIA -->
+<div class="card">
+<h3>Competencia</h3>
+<input type="number" id="laneCount" value="4" min="2" max="10">
+<button class="btn-success" onclick="startCompetition()">Crear Carriles</button>
+<button class="btn-danger" onclick="prepareStart()">🚦 PREPARADOS</button>
+<div id="lanes"></div>
+</div>
+
+<div class="card">
+<h3>Ranking</h3>
+<div id="ranking"></div>
+<button class="btn" onclick="downloadResults()">Descargar Resultados</button>
+</div>
+
 </div>
 
 <script>
@@ -144,48 +152,38 @@ border:none;
 let currentUser=null;
 let currentRole=null;
 let results=[];
+let laneTimers={};
+let globalStartTime;
+let globalInterval;
+let reactionStartTime;
+let raceStarted=false;
 
-window.onload=()=>{
 if(!localStorage.getItem("admin")){
-setupCard.classList.remove("hidden");
-}else{
-loginCard.classList.remove("hidden");
-}
-};
-
-function createAdmin(){
 localStorage.setItem("admin",
-JSON.stringify({user:adminUser.value,pass:adminPass.value}));
-alert("Admin creado");
-location.reload();
+JSON.stringify({user:"admin",pass:"1234"}));
 }
 
 function login(){
-const admin=JSON.parse(localStorage.getItem("admin"));
-const athletes=JSON.parse(localStorage.getItem("athletes")||"[]");
 
-if(admin && loginUser.value===admin.user && loginPass.value===admin.pass){
-currentUser=admin.user;
+let role=roleSelect.value;
+let admin=JSON.parse(localStorage.getItem("admin"));
+let athletes=JSON.parse(localStorage.getItem("athletes")||"[]");
+
+if(role==="admin"){
+if(loginUser.value===admin.user && loginPass.value===admin.pass){
 currentRole="admin";
-adminNav.classList.remove("hidden");
-showSection("competition");
+currentUser=admin.user;
+adminPanel.classList.remove("hidden");
+}
+else{alert("Credenciales incorrectas");return;}
 }
 else{
 let athlete=athletes.find(a=>a.user===loginUser.value && a.pass===loginPass.value);
-if(athlete){
-currentUser=athlete.user;
+if(!athlete){alert("Credenciales incorrectas");return;}
 currentRole="athlete";
-athleteNav.classList.remove("hidden");
-athleteInfoPanel.innerHTML=
-`Nombre: ${athlete.user}<br>
-Edad: ${athlete.age}<br>
-Sexo: ${athlete.gender}<br>
-Categoría: ${athlete.category}`;
-}
-else{
-alert("Credenciales incorrectas");
-return;
-}
+currentUser=athlete.user;
+athletePanel.classList.remove("hidden");
+loadProfile();
 }
 
 loginCard.classList.add("hidden");
@@ -195,13 +193,6 @@ loadAthletes();
 
 function logout(){location.reload();}
 
-function showSection(sec){
-competitionSection.classList.add("hidden");
-adminSection.classList.add("hidden");
-if(sec==="competition")competitionSection.classList.remove("hidden");
-if(sec==="admin")adminSection.classList.remove("hidden");
-}
-
 function createAthlete(){
 let athletes=JSON.parse(localStorage.getItem("athletes")||"[]");
 athletes.push({
@@ -209,15 +200,11 @@ user:newAthlete.value,
 pass:newPass.value,
 age:newAge.value,
 gender:newGender.value,
-category:newCategory.value
+category:newCategory.value,
+phone:"",
+email:"",
+photo:""
 });
-localStorage.setItem("athletes",JSON.stringify(athletes));
-loadAthletes();
-}
-
-function deleteAthlete(user){
-let athletes=JSON.parse(localStorage.getItem("athletes")||"[]");
-athletes=athletes.filter(a=>a.user!==user);
 localStorage.setItem("athletes",JSON.stringify(athletes));
 loadAthletes();
 }
@@ -234,19 +221,148 @@ ${a.user} | ${a.gender} | ${a.age}
 });
 }
 
-function downloadFile(filename,text){
+function deleteAthlete(user){
+let athletes=JSON.parse(localStorage.getItem("athletes")||"[]");
+athletes=athletes.filter(a=>a.user!==user);
+localStorage.setItem("athletes",JSON.stringify(athletes));
+loadAthletes();
+}
+
+function loadProfile(){
+let athletes=JSON.parse(localStorage.getItem("athletes")||"[]");
+let athlete=athletes.find(a=>a.user===currentUser);
+
+profileInfo.innerHTML=`
+Usuario: ${athlete.user}<br>
+Edad: ${athlete.age}<br>
+Sexo: ${athlete.gender}<br>
+Categoría: ${athlete.category}<br>
+<img src="${athlete.photo||''}">
+`;
+
+editPhone.value=athlete.phone||"";
+editEmail.value=athlete.email||"";
+}
+
+function saveProfile(){
+let athletes=JSON.parse(localStorage.getItem("athletes")||"[]");
+let athlete=athletes.find(a=>a.user===currentUser);
+
+athlete.phone=editPhone.value;
+athlete.email=editEmail.value;
+
+let file=photoInput.files[0];
+if(file){
+let reader=new FileReader();
+reader.onload=function(e){
+athlete.photo=e.target.result;
+localStorage.setItem("athletes",JSON.stringify(athletes));
+loadProfile();
+};
+reader.readAsDataURL(file);
+}else{
+localStorage.setItem("athletes",JSON.stringify(athletes));
+loadProfile();
+}
+}
+
+function startCompetition(){
+lanes.innerHTML="";
+results=[];
+laneTimers={};
+
+let athletes=JSON.parse(localStorage.getItem("athletes")||"[]");
+
+for(let i=1;i<=laneCount.value;i++){
+laneTimers[i]={finished:false,currentTime:0,athlete:null};
+
+let options=athletes.map(a=>
+`<option value="${a.user}">${a.user}</option>`).join("");
+
+lanes.innerHTML+=`
+<div class="lane" id="lane${i}">
+Carril ${i}
+<select onchange="laneTimers[${i}].athlete=this.value">
+<option value="">Asignar atleta</option>
+${options}
+</select>
+<div class="timeDisplay" id="time${i}">0.000</div>
+<button onclick="finishLane(${i})">TOCAR</button>
+</div>`;
+}
+}
+
+function prepareStart(){
+raceStarted=false;
+let delay=Math.floor(Math.random()*2000)+1000;
+setTimeout(()=>{
+reactionStartTime=Date.now();
+raceStarted=true;
+globalStartTime=Date.now();
+globalInterval=setInterval(updateTimers,10);
+},delay);
+}
+
+function updateTimers(){
+let now=Date.now();
+for(let i in laneTimers){
+if(!laneTimers[i].finished){
+let elapsed=now-globalStartTime;
+laneTimers[i].currentTime=elapsed;
+document.getElementById("time"+i).innerText=
+(elapsed/1000).toFixed(3);
+}
+}
+}
+
+function finishLane(i){
+if(laneTimers[i].finished)return;
+laneTimers[i].finished=true;
+
+let finalTime=laneTimers[i].currentTime/1000;
+let reaction=(Date.now()-reactionStartTime)/1000;
+
+results.push({
+name:laneTimers[i].athlete||"Sin atleta",
+time:finalTime,
+reaction:reaction
+});
+
+results.sort((a,b)=>a.time-b.time);
+renderRanking();
+}
+
+function renderRanking(){
+ranking.innerHTML="";
+results.forEach((r,index)=>{
+let medal="";
+if(index===0)medal="🥇";
+if(index===1)medal="🥈";
+if(index===2)medal="🥉";
+
+ranking.innerHTML+=`
+<div>
+<span class="medal">${medal}</span>
+${index+1}° ${r.name}
+| ${r.time.toFixed(3)}s
+| Reacción ${r.reaction.toFixed(3)}s
+</div>`;
+});
+}
+
+function downloadFile(name,text){
 let blob=new Blob([text],{type:"text/plain"});
 let a=document.createElement("a");
 a.href=URL.createObjectURL(blob);
-a.download=filename;
+a.download=name;
 a.click();
 }
 
 function downloadAthletes(){
 let athletes=JSON.parse(localStorage.getItem("athletes")||"[]");
-let text="LISTA DE ATLETAS\n\n";
+let text="LISTA ATLETAS\n\n";
 athletes.forEach(a=>{
-text+=`${a.user} - ${a.gender} - ${a.age} - ${a.category}\n`;
+text+=`${a.user} - ${a.email} - ${a.phone}\n`;
 });
 downloadFile("atletas.txt",text);
 }
@@ -254,7 +370,7 @@ downloadFile("atletas.txt",text);
 function downloadResults(){
 let text="RESULTADOS\n\n";
 results.forEach(r=>{
-text+=`${r.name} - Tiempo: ${r.time}s - Reacción: ${r.reaction}s\n`;
+text+=`${r.name} - ${r.time}s - ${r.reaction}s\n`;
 });
 downloadFile("resultados.txt",text);
 }
@@ -263,7 +379,7 @@ function downloadMyResults(){
 let text="MIS RESULTADOS\n\n";
 results.filter(r=>r.name===currentUser)
 .forEach(r=>{
-text+=`Tiempo: ${r.time}s - Reacción: ${r.reaction}s\n`;
+text+=`${r.time}s - ${r.reaction}s\n`;
 });
 downloadFile("mis_resultados.txt",text);
 }

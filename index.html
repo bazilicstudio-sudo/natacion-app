@@ -27,28 +27,31 @@ transition:0.3s;
 box-shadow:0 0 15px #22c55e;
 animation:pulse 1s infinite;
 }
-.lane.finished{
-background:#1e293b;
-}
+.lane.finished{background:#1e293b;}
 @keyframes pulse{
 0%{opacity:1}
 50%{opacity:0.6}
 100%{opacity:1}
 }
 .ranking{margin-top:10px;font-size:14px}
+.nav button{margin-right:6px}
 </style>
 </head>
 <body>
 
 <h2>🏊 Sistema Competencia Elite</h2>
 
-<div id="loginCard" class="card">
+<div id="setupCard" class="card hidden">
+<h3>Crear Administrador</h3>
+<input type="text" id="adminUser" placeholder="Usuario Admin">
+<input type="password" id="adminPass" placeholder="Contraseña">
+<button class="btn-success" onclick="createAdmin()">Crear Cuenta</button>
+</div>
+
+<div id="loginCard" class="card hidden">
 <h3>Login</h3>
-<select id="role">
-<option value="coach">Entrenador</option>
-<option value="athlete">Atleta</option>
-</select>
-<input type="text" id="username" placeholder="Nombre">
+<input type="text" id="loginUser" placeholder="Usuario">
+<input type="password" id="loginPass" placeholder="Contraseña">
 <button class="btn" onclick="login()">Ingresar</button>
 </div>
 
@@ -58,22 +61,23 @@ background:#1e293b;
 <button class="btn-danger" onclick="logout()">Cerrar Sesión</button>
 </div>
 
-<div id="coachPanel" class="hidden">
-
-<div class="card">
-<h3>Crear Atleta</h3>
-<input type="text" id="newAthlete">
-<button class="btn" onclick="createAthlete()">Crear</button>
+<div class="nav card hidden" id="adminNav">
+<button class="btn" onclick="showSection('competition')">Competencia</button>
+<button class="btn" onclick="showSection('training')">Entrenamiento</button>
+<button class="btn" onclick="showSection('admin')">Administración</button>
 </div>
+
+<div id="competitionSection" class="hidden">
 
 <div class="card">
 <h3>Evento</h3>
 <input type="text" id="eventName" placeholder="Nombre del evento">
+<input type="number" id="laneCount" min="2" max="10" value="8">
 <button class="btn-success" onclick="startCompetition()">Iniciar Competencia</button>
 </div>
 
 <div class="card">
-<h3>8 Carriles</h3>
+<h3>Carriles</h3>
 <div id="lanes"></div>
 </div>
 
@@ -89,6 +93,34 @@ background:#1e293b;
 
 </div>
 
+<div id="trainingSection" class="hidden">
+<div class="card">
+<h3>Registrar Tiempo Entrenamiento</h3>
+<select id="trainingAthlete"></select>
+<input type="number" id="trainingTime" placeholder="Tiempo en ms">
+<button class="btn" onclick="saveTraining()">Guardar</button>
+</div>
+
+<div class="card">
+<h3>Historial Entrenamiento</h3>
+<div id="trainingHistory"></div>
+</div>
+</div>
+
+<div id="adminSection" class="hidden">
+<div class="card">
+<h3>Crear Atleta</h3>
+<input type="text" id="newAthlete">
+<input type="password" id="newPass" placeholder="Contraseña">
+<button class="btn" onclick="createAthlete()">Crear</button>
+</div>
+
+<div class="card">
+<h3>Lista Atletas</h3>
+<div id="athleteList"></div>
+</div>
+</div>
+
 <div id="athletePanel" class="hidden">
 <div class="card">
 <h3>Mis Resultados</h3>
@@ -99,67 +131,103 @@ background:#1e293b;
 </div>
 
 <script>
-let session=JSON.parse(localStorage.getItem("session"))||null;
-let athletes=JSON.parse(localStorage.getItem("athletes"))||[];
-let competitions=JSON.parse(localStorage.getItem("competitions"))||[];
+let db=JSON.parse(localStorage.getItem("eliteDB"))||{
+users:[],
+competitions:[],
+trainings:[]
+};
+
+let session=null;
 let lanes=[];
 let audioCtx=new(window.AudioContext||window.webkitAudioContext)();
 
-function beep(freq,duration){
-let osc=audioCtx.createOscillator();
-osc.frequency.value=freq;
-osc.connect(audioCtx.destination);
-osc.start();
-setTimeout(()=>osc.stop(),duration);
+function saveDB(){localStorage.setItem("eliteDB",JSON.stringify(db));}
+
+function initSystem(){
+if(!db.users.find(u=>u.role==="admin")){
+document.getElementById("setupCard").classList.remove("hidden");
+}else{
+document.getElementById("loginCard").classList.remove("hidden");
+}
 }
 
-function login(){
-let role=document.getElementById("role").value;
-let name=document.getElementById("username").value;
-if(!name)return alert("Escribe nombre");
-session={role,name};
-localStorage.setItem("session",JSON.stringify(session));
-init();
-}
-
-function logout(){
-localStorage.removeItem("session");
+function createAdmin(){
+let u=adminUser.value;
+let p=adminPass.value;
+if(!u||!p)return alert("Completa datos");
+db.users.push({user:u,pass:p,role:"admin"});
+saveDB();
 location.reload();
 }
 
-function createAthlete(){
-let name=document.getElementById("newAthlete").value;
-if(!name)return;
-athletes.push({name});
-localStorage.setItem("athletes",JSON.stringify(athletes));
-document.getElementById("newAthlete").value="";
-alert("Atleta creado");
-initLanes();
-}
-
-function init(){
-if(!session)return;
+function login(){
+let u=loginUser.value;
+let p=loginPass.value;
+let user=db.users.find(x=>x.user===u && x.pass===p);
+if(!user)return alert("Datos incorrectos");
+session=user;
 document.getElementById("loginCard").classList.add("hidden");
 document.getElementById("app").classList.remove("hidden");
 
-if(session.role==="coach"){
-document.getElementById("coachPanel").classList.remove("hidden");
-initLanes();
+if(user.role==="admin"){
+adminNav.classList.remove("hidden");
+showSection("competition");
+loadAthletes();
 showHistory();
 }else{
-document.getElementById("athletePanel").classList.remove("hidden");
+athletePanel.classList.remove("hidden");
 showAthleteResults();
 }
 }
 
+function logout(){location.reload();}
+
+function showSection(sec){
+competitionSection.classList.add("hidden");
+trainingSection.classList.add("hidden");
+adminSection.classList.add("hidden");
+document.getElementById(sec+"Section").classList.remove("hidden");
+}
+
+function createAthlete(){
+let name=newAthlete.value;
+let pass=newPass.value;
+if(!name||!pass)return;
+db.users.push({user:name,pass:pass,role:"athlete"});
+saveDB();
+newAthlete.value="";
+newPass.value="";
+loadAthletes();
+}
+
+function loadAthletes(){
+let list=db.users.filter(u=>u.role==="athlete");
+athleteList.innerHTML="";
+trainingAthlete.innerHTML="";
+list.forEach(a=>{
+athleteList.innerHTML+=`${a.user} <button class="btn-danger" onclick="deleteAthlete('${a.user}')">Eliminar</button><br>`;
+trainingAthlete.innerHTML+=`<option>${a.user}</option>`;
+});
+}
+
+function deleteAthlete(name){
+db.users=db.users.filter(u=>u.user!==name);
+db.competitions.forEach(c=>{
+c.results=c.results.filter(r=>r.athlete!==name);
+});
+saveDB();
+loadAthletes();
+showHistory();
+}
+
 function initLanes(){
-let container=document.getElementById("lanes");
-container.innerHTML="";
 lanes=[];
-for(let i=1;i<=8;i++){
+lanesDiv.innerHTML="";
+let count=parseInt(laneCount.value);
+for(let i=1;i<=count;i++){
 lanes.push({lane:i,time:0,start:0,interval:null,finished:false,athlete:null});
-let options=athletes.map(a=>`<option>${a.name}</option>`).join("");
-container.innerHTML+=`
+let options=db.users.filter(u=>u.role==="athlete").map(a=>`<option>${a.user}</option>`).join("");
+lanesDiv.innerHTML+=`
 <div class="lane" id="lane${i}">
 <div>
 Carril ${i}
@@ -183,14 +251,23 @@ let mil=Math.floor(ms%1000);
 return String(m).padStart(2,'0')+":"+String(s).padStart(2,'0')+"."+String(mil).padStart(3,'0');
 }
 
+function beep(f,d){
+audioCtx.resume();
+let o=audioCtx.createOscillator();
+o.frequency.value=f;
+o.connect(audioCtx.destination);
+o.start();
+setTimeout(()=>o.stop(),d);
+}
+
 function startCompetition(){
+initLanes();
 beep(800,300);
-let event=document.getElementById("eventName").value||"Evento sin nombre";
 lanes.forEach(l=>{
 let athlete=document.getElementById("athlete"+l.lane).value;
+if(!athlete)return;
 l.athlete=athlete;
 l.start=performance.now();
-l.finished=false;
 document.getElementById("lane"+l.lane).classList.add("running");
 l.interval=setInterval(()=>{
 l.time=performance.now()-l.start;
@@ -199,72 +276,83 @@ document.getElementById("time"+l.lane).innerText=format(l.time);
 });
 }
 
-function stopLane(num){
-let lane=lanes.find(l=>l.lane===num);
-if(lane.finished)return;
-clearInterval(lane.interval);
-lane.finished=true;
-document.getElementById("lane"+num).classList.remove("running");
-document.getElementById("lane"+num).classList.add("finished");
+function stopLane(n){
+let l=lanes.find(x=>x.lane===n);
+if(!l||l.finished)return;
+clearInterval(l.interval);
+l.finished=true;
+document.getElementById("lane"+n).classList.remove("running");
+document.getElementById("lane"+n).classList.add("finished");
 beep(400,200);
 updateRanking();
-checkEnd();
+if(lanes.every(x=>x.finished||!x.athlete)){
+saveCompetition();
+}
 }
 
 function updateRanking(){
 let ranking=lanes.filter(l=>l.finished&&l.athlete).sort((a,b)=>a.time-b.time);
 let medals=["🥇","🥈","🥉"];
-let html="";
+rankingDiv.innerHTML="";
 ranking.forEach((l,i)=>{
-html+=`${medals[i]||""} ${l.athlete} - ${format(l.time)}<br>`;
+rankingDiv.innerHTML+=`${medals[i]||""} ${l.athlete} - ${format(l.time)}<br>`;
 });
-document.getElementById("ranking").innerHTML=html;
-}
-
-function checkEnd(){
-if(lanes.every(l=>l.finished)){
-saveCompetition();
-beep(1000,500);
-}
 }
 
 function saveCompetition(){
-let event=document.getElementById("eventName").value||"Evento";
+let event=eventName.value||"Evento";
 let results=lanes.filter(l=>l.athlete).map(l=>({athlete:l.athlete,time:l.time}));
-competitions.push({event,date:new Date().toLocaleString(),results});
-localStorage.setItem("competitions",JSON.stringify(competitions));
+db.competitions.push({event,date:new Date().toLocaleString(),results});
+saveDB();
 showHistory();
 }
 
 function showHistory(){
-let div=document.getElementById("history");
-let html="";
-competitions.forEach(c=>{
-html+=`<strong>${c.event}</strong> - ${c.date}<br>`;
+history.innerHTML="";
+db.competitions.forEach((c,i)=>{
+history.innerHTML+=`<strong>${c.event}</strong> ${c.date}
+<button class="btn-danger" onclick="deleteCompetition(${i})">Eliminar</button><br>`;
 c.results.forEach(r=>{
-html+=`${r.athlete} - ${format(r.time)}<br>`;
+history.innerHTML+=`${r.athlete} - ${format(r.time)}<br>`;
 });
-html+="<hr>";
+history.innerHTML+="<hr>";
 });
-div.innerHTML=html;
+}
+
+function deleteCompetition(i){
+db.competitions.splice(i,1);
+saveDB();
+showHistory();
+}
+
+function saveTraining(){
+let athlete=trainingAthlete.value;
+let time=parseInt(trainingTime.value);
+if(!athlete||!time)return;
+db.trainings.push({athlete,time,date:new Date().toLocaleString()});
+saveDB();
+showTraining();
+}
+
+function showTraining(){
+trainingHistory.innerHTML="";
+db.trainings.forEach(t=>{
+trainingHistory.innerHTML+=`${t.athlete} - ${format(t.time)} - ${t.date}<br>`;
+});
 }
 
 function showAthleteResults(){
-let div=document.getElementById("myResults");
-let html="";
-competitions.forEach(c=>{
+myResults.innerHTML="";
+db.competitions.forEach(c=>{
 c.results.forEach(r=>{
-if(r.athlete===session.name){
-html+=`${c.event} - ${format(r.time)}<br>`;
+if(r.athlete===session.user){
+myResults.innerHTML+=`${c.event} - ${format(r.time)}<br>`;
 }
 });
 });
-div.innerHTML=html||"Sin resultados";
 }
 
-init();
+initSystem();
 </script>
-
 </body>
 </html>
-

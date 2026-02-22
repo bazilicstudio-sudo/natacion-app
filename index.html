@@ -4,10 +4,27 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>🏊 Sistema Competencia Elite PRO</title>
+<link rel="manifest" href="manifest.json">
+<meta name="theme-color" content="#0f172a">
 
 <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+function playStartSound(){
+    const ctx = new (window.AudioContext || window.webkitAudioContext)();
+    const osc = ctx.createOscillator();
+    const gain = ctx.createGain();
+
+    osc.type = "square";
+    osc.frequency.setValueAtTime(800, ctx.currentTime);
+    gain.gain.setValueAtTime(1, ctx.currentTime);
+
+    osc.connect(gain);
+    gain.connect(ctx.destination);
+
+    osc.start();
+    osc.stop(ctx.currentTime + 0.15);
+}
 
 <style>
 body{
@@ -274,6 +291,9 @@ let randomDelay=Math.floor(Math.random()*2000)+1000;
 
 setTimeout(()=>{
 startSignal.innerHTML="🔊 ¡YA!";
+playStartSound();
+if(navigator.vibrate) navigator.vibrate(200);
+speechSynthesis.speak(new SpeechSynthesisUtterance("Ya"));
 startSignal.style.color="#22c55e";
 
 reactionStartTime=Date.now();
@@ -313,7 +333,26 @@ if(laneTimers[i].finished)return;
 
 // SALIDA FALSA
 if(!raceStarted){
+
 laneTimers[i].falseStart=true;
+
+document.getElementById("lane"+i).style.background="#7f1d1d";
+document.getElementById("reaction"+i).innerHTML="❌ SALIDA FALSA";
+
+results.push({
+lane:i,
+time:999,
+reaction:0,
+penalty:"DQ"
+});
+
+ranking.innerHTML+=`
+<div style="color:red">
+Carril ${i} DESCALIFICADO
+</div>`;
+
+return;
+}
 document.getElementById("lane"+i).style.background="#7f1d1d";
 document.getElementById("reaction"+i).innerHTML="❌ SALIDA FALSA";
 return;
@@ -355,7 +394,10 @@ if(Object.values(laneTimers)
 clearInterval(globalInterval);
 }
 }
-
+if("serviceWorker" in navigator){
+navigator.serviceWorker.register("sw.js");
+}
 </script>
 </body>
 </html>
+

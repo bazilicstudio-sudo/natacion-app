@@ -3,223 +3,261 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>🏊 Control Natación PRO</title>
+<title>🏊 Natación Elite PRO</title>
 
 <link rel="manifest" href="manifest.json">
-<meta name="theme-color" content="#0d6efd">
+<meta name="theme-color" content="#111827">
 
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.js"></script>
 
 <style>
 body {
-    font-family: Arial, sans-serif;
-    margin: 0;
-    padding: 20px;
-    background: #eef2f7;
+    margin:0;
+    font-family: 'Segoe UI', sans-serif;
+    background: linear-gradient(180deg,#0f172a,#111827);
+    color:white;
+    padding:15px;
 }
 
 h1 {
-    text-align: center;
-}
-
-button {
-    padding: 10px 15px;
-    margin: 5px 0;
-    border: none;
-    border-radius: 6px;
-    background: #0d6efd;
-    color: white;
-    cursor: pointer;
-}
-
-button.danger {
-    background: red;
-}
-
-input, select {
-    padding: 8px;
-    margin: 5px 0;
-    width: 100%;
+    text-align:center;
+    font-size:22px;
+    margin-bottom:20px;
 }
 
 .card {
-    background: white;
-    padding: 15px;
-    margin-bottom: 15px;
-    border-radius: 10px;
-    box-shadow: 0 3px 10px rgba(0,0,0,0.1);
+    background:#1f2937;
+    padding:15px;
+    border-radius:15px;
+    margin-bottom:15px;
+    box-shadow:0 4px 20px rgba(0,0,0,0.5);
+}
+
+button {
+    padding:10px;
+    margin:5px 3px;
+    border:none;
+    border-radius:10px;
+    font-weight:bold;
+    cursor:pointer;
+}
+
+.btn-primary { background:#2563eb; color:white; }
+.btn-danger { background:#dc2626; color:white; }
+.btn-success { background:#16a34a; color:white; }
+.btn-warning { background:#f59e0b; color:black; }
+
+input, select {
+    width:100%;
+    padding:10px;
+    margin:5px 0;
+    border-radius:10px;
+    border:none;
 }
 
 #timer {
-    font-size: 2.5rem;
-    text-align: center;
-    margin: 20px 0;
-    font-weight: bold;
+    font-size:3rem;
+    text-align:center;
+    font-weight:bold;
+    letter-spacing:2px;
+    margin:20px 0;
 }
 
-canvas {
-    background: white;
-    border-radius: 10px;
+.running {
+    color:#22c55e;
+    animation:pulse 1s infinite;
+}
+
+@keyframes pulse {
+    0% { opacity:1; }
+    50% { opacity:0.6; }
+    100% { opacity:1; }
+}
+
+table {
+    width:100%;
+    border-collapse:collapse;
+    font-size:13px;
+}
+
+th, td {
+    border:1px solid #374151;
+    padding:6px;
+    text-align:center;
+}
+
+th {
+    background:#2563eb;
+}
+
+.ranking {
+    font-size:14px;
+    margin-bottom:10px;
+}
+
+.medal {
+    font-size:18px;
 }
 </style>
 </head>
 <body>
 
-<h1>🏊 Control de Atletas</h1>
+<h1>🏊 Natación Elite PRO</h1>
 
 <div class="card">
-    <h3>Agregar Atleta</h3>
-    <input type="text" id="athleteName" placeholder="Nombre del atleta">
-    <button onclick="addAthlete()">Agregar</button>
+<h3>Agregar Atleta</h3>
+<input type="text" id="athleteName" placeholder="Nombre del atleta">
+<button class="btn-primary" onclick="addAthlete()">Agregar</button>
 </div>
 
 <div class="card">
-    <h3>Cronómetro Profesional</h3>
-    <div id="timer">00:00.000</div>
-    <button onclick="startTimer()">Iniciar</button>
-    <button onclick="stopTimer()">Detener</button>
-    <button onclick="resetTimer()">Reiniciar</button>
-    <button onclick="saveTime()">Guardar Tiempo</button>
+<h3>Cronómetro Competencia</h3>
+<div id="timer">00:00.000</div>
+<button class="btn-success" onclick="startTimer()">Iniciar</button>
+<button class="btn-warning" onclick="stopTimer()">Detener</button>
+<button class="btn-danger" onclick="resetTimer()">Reiniciar</button>
+<button class="btn-primary" onclick="saveTime()">Guardar</button>
 </div>
 
 <div class="card">
-    <h3>Seleccionar Atleta</h3>
-    <select id="athleteSelect"></select>
-    <input type="text" id="observation" placeholder="Observación (opcional)">
+<h3>Seleccionar Atleta</h3>
+<select id="athleteSelect"></select>
+<input type="text" id="observation" placeholder="Observación">
 </div>
 
 <div class="card">
-    <h3>Progreso por Atleta</h3>
-    <canvas id="progressChart"></canvas>
+<h3>Ranking General 🏆</h3>
+<div id="ranking"></div>
+</div>
+
+<div class="card">
+<h3>Progreso</h3>
+<canvas id="progressChart"></canvas>
 </div>
 
 <script>
 let athletes = JSON.parse(localStorage.getItem("athletes")) || [];
 let chart;
+let startTime=0, elapsedTime=0, timerInterval=null, running=false;
 
-let startTime = 0;
-let elapsedTime = 0;
-let timerInterval = null;
-let running = false;
-
-function formatTime(ms) {
-    let minutes = Math.floor(ms / 60000);
-    let seconds = Math.floor((ms % 60000) / 1000);
-    let mil = Math.floor(ms % 1000);
-
-    return (
-        String(minutes).padStart(2,'0') + ":" +
-        String(seconds).padStart(2,'0') + "." +
-        String(mil).padStart(3,'0')
-    );
+function formatTime(ms){
+let m=Math.floor(ms/60000);
+let s=Math.floor((ms%60000)/1000);
+let mil=Math.floor(ms%1000);
+return String(m).padStart(2,'0')+":"+String(s).padStart(2,'0')+"."+String(mil).padStart(3,'0');
 }
 
-function startTimer() {
-    if (running) return;
-
-    running = true;
-    startTime = performance.now() - elapsedTime;
-
-    timerInterval = setInterval(() => {
-        elapsedTime = performance.now() - startTime;
-        document.getElementById("timer").innerText = formatTime(elapsedTime);
-    }, 10);
+function startTimer(){
+if(running) return;
+running=true;
+document.getElementById("timer").classList.add("running");
+startTime=performance.now()-elapsedTime;
+timerInterval=setInterval(()=>{
+elapsedTime=performance.now()-startTime;
+document.getElementById("timer").innerText=formatTime(elapsedTime);
+},10);
 }
 
-function stopTimer() {
-    running = false;
-    clearInterval(timerInterval);
+function stopTimer(){
+running=false;
+clearInterval(timerInterval);
+document.getElementById("timer").classList.remove("running");
 }
 
-function resetTimer() {
-    running = false;
-    clearInterval(timerInterval);
-    elapsedTime = 0;
-    document.getElementById("timer").innerText = "00:00.000";
+function resetTimer(){
+running=false;
+clearInterval(timerInterval);
+elapsedTime=0;
+document.getElementById("timer").innerText="00:00.000";
+document.getElementById("timer").classList.remove("running");
 }
 
-function saveTime() {
-    let select = document.getElementById("athleteSelect");
-    let name = select.value;
-
-    if (!name) return alert("Selecciona un atleta");
-
-    let athlete = athletes.find(a => a.name === name);
-
-    athlete.times.push({
-        time: Math.floor(elapsedTime),
-        obs: document.getElementById("observation").value
-    });
-
-    saveData();
-    updateChart();
-    resetTimer();
-    document.getElementById("observation").value = "";
+function saveTime(){
+let name=document.getElementById("athleteSelect").value;
+if(!name) return alert("Selecciona atleta");
+let athlete=athletes.find(a=>a.name===name);
+athlete.times.push({time:Math.floor(elapsedTime),obs:document.getElementById("observation").value});
+resetTimer();
+document.getElementById("observation").value="";
+saveData();
+updateAll();
 }
 
-function addAthlete() {
-    let name = document.getElementById("athleteName").value;
-    if (!name) return;
-
-    let colors = ["red","blue","green","orange","purple","brown","black"];
-    let color = colors[athletes.length % colors.length];
-
-    athletes.push({ name, times: [], color });
-
-    document.getElementById("athleteName").value = "";
-    saveData();
-    updateSelect();
-    updateChart();
+function addAthlete(){
+let name=document.getElementById("athleteName").value;
+if(!name) return;
+let colors=["#ef4444","#3b82f6","#22c55e","#f59e0b","#a855f7","#14b8a6"];
+athletes.push({name,times:[],color:colors[athletes.length%colors.length]});
+document.getElementById("athleteName").value="";
+saveData();
+updateAll();
 }
 
-function updateSelect() {
-    let select = document.getElementById("athleteSelect");
-    select.innerHTML = "";
-    athletes.forEach(a => {
-        let option = document.createElement("option");
-        option.value = a.name;
-        option.textContent = a.name;
-        select.appendChild(option);
-    });
+function saveData(){
+localStorage.setItem("athletes",JSON.stringify(athletes));
 }
 
-function saveData() {
-    localStorage.setItem("athletes", JSON.stringify(athletes));
+function updateSelect(){
+let select=document.getElementById("athleteSelect");
+select.innerHTML="";
+athletes.forEach(a=>{
+let option=document.createElement("option");
+option.value=a.name;
+option.textContent=a.name;
+select.appendChild(option);
+});
 }
 
-function updateChart() {
-    let ctx = document.getElementById("progressChart").getContext("2d");
+function updateRanking(){
+let div=document.getElementById("ranking");
+let ranking=athletes
+.map(a=>{
+let best=Math.min(...a.times.map(t=>t.time),Infinity);
+return {name:a.name,best};
+})
+.filter(a=>a.best!==Infinity)
+.sort((a,b)=>a.best-b.best);
 
-    if (chart) chart.destroy();
-
-    chart = new Chart(ctx, {
-        type: "line",
-        data: {
-            labels: Array.from({length: 20}, (_, i) => "Intento " + (i+1)),
-            datasets: athletes.map(a => ({
-                label: a.name,
-                data: a.times.map(t => t.time / 1000),
-                borderColor: a.color,
-                tension: 0,
-                fill: false
-            }))
-        },
-        options: {
-            responsive: true,
-            plugins: {
-                legend: { position: 'top' }
-            }
-        }
-    });
+let medals=["🥇","🥈","🥉"];
+let html="";
+ranking.forEach((a,i)=>{
+html+=`<div class="ranking">${medals[i]||""} ${a.name} - ${formatTime(a.best)}</div>`;
+});
+div.innerHTML=html||"Sin tiempos registrados";
 }
 
+function updateChart(){
+let ctx=document.getElementById("progressChart").getContext("2d");
+if(chart) chart.destroy();
+chart=new Chart(ctx,{
+type:"line",
+data:{
+labels:Array.from({length:20},(_,i)=>"Intento "+(i+1)),
+datasets:athletes.map(a=>({
+label:a.name,
+data:a.times.map(t=>t.time/1000),
+borderColor:a.color,
+tension:0,
+fill:false
+}))
+},
+options:{responsive:true}
+});
+}
+
+function updateAll(){
 updateSelect();
+updateRanking();
 updateChart();
+}
 
-if ('serviceWorker' in navigator) {
-    navigator.serviceWorker.register('service-worker.js');
+updateAll();
+
+if('serviceWorker' in navigator){
+navigator.serviceWorker.register('service-worker.js');
 }
 </script>
 
 </body>
 </html>
+

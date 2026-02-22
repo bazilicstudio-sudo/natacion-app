@@ -83,6 +83,8 @@ animation:pulse 1s infinite;
 <div class="card">
 <h3>Evento</h3>
 <input type="text" id="eventName" placeholder="Nombre del evento">
+<input type="text" id="eventTest" placeholder="Nombre de la prueba (Ej: 100m Libre)">
+<input type="number" id="eventDistance" placeholder="Metros a competir">
 <input type="number" id="laneCount" min="2" max="10" value="8">
 <button class="btn-success" onclick="startCompetition()">Iniciar Competencia</button>
 </div>
@@ -111,6 +113,8 @@ animation:pulse 1s infinite;
 <h3>Registrar Tiempo</h3>
 <select id="trainingAthlete"></select>
 <input type="number" id="trainingTime" placeholder="Tiempo en milisegundos">
+<input type="number" id="trainingHours" placeholder="Horas de entrenamiento">
+<input type="number" id="trainingSeries" placeholder="Cantidad de series realizadas">
 <button class="btn" onclick="saveTraining()">Guardar</button>
 <button class="btn-success" onclick="exportExcel()">Exportar Excel</button>
 <button class="btn-success" onclick="exportFullPDF()">Exportar PDF Academia</button>
@@ -311,10 +315,12 @@ function finishRace(i){
 function saveCompetition(){
     let historyData = JSON.parse(localStorage.getItem("competitionHistory")||"[]");
     historyData.push({
-        event:eventName.value,
-        date:new Date().toLocaleString(),
-        results:results
-    });
+    event:eventName.value,
+    test:eventTest.value,
+    distance:eventDistance.value,
+    date:new Date().toLocaleString(),
+    results:results
+});
     localStorage.setItem("competitionHistory", JSON.stringify(historyData));
     loadHistory();
 }
@@ -323,7 +329,9 @@ function loadHistory(){
     let historyData = JSON.parse(localStorage.getItem("competitionHistory")||"[]");
     history.innerHTML="";
     historyData.forEach(h=>{
-        history.innerHTML+=`<div>${h.date} - ${h.event}</div>`;
+        history.innerHTML+=`<div>
+${h.date} - ${h.event} | ${h.test} | ${h.distance}m
+</div>`;
     });
 }
 
@@ -334,10 +342,12 @@ function loadHistory(){
 function saveTraining(){
     let data = JSON.parse(localStorage.getItem("trainingData")||"[]");
     data.push({
-        athlete:trainingAthlete.value,
-        time:parseFloat(trainingTime.value),
-        date:new Date().toLocaleDateString()
-    });
+    athlete:trainingAthlete.value,
+    time:parseFloat(trainingTime.value),
+    hours:parseFloat(trainingHours.value),
+    series:parseInt(trainingSeries.value),
+    date:new Date().toLocaleDateString()
+});
     localStorage.setItem("trainingData", JSON.stringify(data));
     trainingTime.value="";
     loadTraining();
@@ -347,7 +357,9 @@ function loadTraining(){
     let data = JSON.parse(localStorage.getItem("trainingData")||"[]");
     trainingHistory.innerHTML="";
     data.forEach(d=>{
-        trainingHistory.innerHTML+=`<div>${d.date} - ${d.athlete} - ${d.time} ms</div>`;
+        trainingHistory.innerHTML+=`<div>
+${d.date} - ${d.athlete} - ${d.time} ms | ${d.hours}h | ${d.series} series
+</div>`;
     });
 }
 
@@ -356,7 +368,9 @@ function loadMyResults(){
     myResults.innerHTML="";
     data.filter(d=>d.athlete===currentUser)
     .forEach(d=>{
-        myResults.innerHTML+=`<div>${d.date} - ${d.time} ms</div>`;
+        myResults.innerHTML+=`<div>
+${d.date} - ${d.time} ms | ${d.hours}h | ${d.series} series
+</div>`;
     });
 }
 // ===============================

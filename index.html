@@ -1,0 +1,199 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>🏊 Control Natación</title>
+
+<link rel="manifest" href="manifest.json">
+<meta name="theme-color" content="#0d6efd">
+
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+
+<style>
+body {
+    font-family: Arial, sans-serif;
+    margin: 0;
+    padding: 20px;
+    background: #f4f6f9;
+}
+
+h1 {
+    text-align: center;
+}
+
+button {
+    padding: 10px 15px;
+    margin: 5px 0;
+    border: none;
+    border-radius: 6px;
+    background: #0d6efd;
+    color: white;
+    cursor: pointer;
+}
+
+button.danger {
+    background: red;
+}
+
+input {
+    padding: 8px;
+    margin: 5px 0;
+    width: 100%;
+}
+
+.card {
+    background: white;
+    padding: 15px;
+    margin-bottom: 15px;
+    border-radius: 10px;
+}
+
+#timer {
+    font-size: 2rem;
+    text-align: center;
+    margin: 15px 0;
+}
+
+canvas {
+    background: white;
+    border-radius: 10px;
+}
+</style>
+</head>
+<body>
+
+<h1>🏊 Control de Atletas</h1>
+
+<div class="card">
+    <h3>Agregar Atleta</h3>
+    <input type="text" id="athleteName" placeholder="Nombre del atleta">
+    <button onclick="addAthlete()">Agregar</button>
+</div>
+
+<div class="card">
+    <h3>Cronómetro</h3>
+    <div id="timer">00:00.000</div>
+    <button onclick="startTimer()">Iniciar</button>
+    <button onclick="stopTimer()">Detener</button>
+    <button onclick="saveTime()">Guardar Tiempo</button>
+</div>
+
+<div class="card">
+    <h3>Seleccionar Atleta</h3>
+    <select id="athleteSelect"></select>
+    <input type="text" id="observation" placeholder="Observación (opcional)">
+</div>
+
+<div class="card">
+    <h3>Gráfico de Progreso</h3>
+    <canvas id="progressChart"></canvas>
+</div>
+
+<script>
+let athletes = JSON.parse(localStorage.getItem("athletes")) || [];
+let timerInterval;
+let milliseconds = 0;
+let chart;
+
+function formatTime(ms) {
+    let minutes = Math.floor(ms / 60000);
+    let seconds = Math.floor((ms % 60000) / 1000);
+    let mil = ms % 1000;
+
+    return 
+        String(minutes).padStart(2,'0') + ":" +
+        String(seconds).padStart(2,'0') + "." +
+        String(mil).padStart(3,'0');
+}
+
+function startTimer() {
+    clearInterval(timerInterval);
+    timerInterval = setInterval(() => {
+        milliseconds += 10;
+        document.getElementById("timer").innerText = formatTime(milliseconds);
+    }, 10);
+}
+
+function stopTimer() {
+    clearInterval(timerInterval);
+}
+
+function saveTime() {
+    let select = document.getElementById("athleteSelect");
+    let name = select.value;
+    if(!name) return alert("Selecciona un atleta");
+
+    let athlete = athletes.find(a => a.name === name);
+    athlete.times.push({
+        time: milliseconds,
+        obs: document.getElementById("observation").value
+    });
+
+    milliseconds = 0;
+    document.getElementById("timer").innerText = "00:00.000";
+    document.getElementById("observation").value = "";
+
+    saveData();
+    updateChart();
+}
+
+function addAthlete() {
+    let name = document.getElementById("athleteName").value;
+    if(!name) return;
+
+    let colors = ["red","blue","green","orange","purple","brown"];
+    let color = colors[athletes.length % colors.length];
+
+    athletes.push({ name, times: [], color });
+    document.getElementById("athleteName").value = "";
+
+    saveData();
+    updateSelect();
+    updateChart();
+}
+
+function updateSelect() {
+    let select = document.getElementById("athleteSelect");
+    select.innerHTML = "";
+    athletes.forEach(a => {
+        let option = document.createElement("option");
+        option.value = a.name;
+        option.textContent = a.name;
+        select.appendChild(option);
+    });
+}
+
+function saveData() {
+    localStorage.setItem("athletes", JSON.stringify(athletes));
+}
+
+function updateChart() {
+    let ctx = document.getElementById("progressChart").getContext("2d");
+
+    if(chart) chart.destroy();
+
+    chart = new Chart(ctx, {
+        type: "line",
+        data: {
+            labels: athletes[0]?.times.map((_,i)=> "Intento " + (i+1)) || [],
+            datasets: athletes.map(a => ({
+                label: a.name,
+                data: a.times.map(t => t.time/1000),
+                borderColor: a.color,
+                fill: false
+            }))
+        }
+    });
+}
+
+updateSelect();
+updateChart();
+
+if ('serviceWorker' in navigator) {
+    navigator.serviceWorker.register('service-worker.js');
+}
+</script>
+
+</body>
+</html>

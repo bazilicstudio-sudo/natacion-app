@@ -17,7 +17,7 @@ button{padding:10px;margin:5px 0;border:none;border-radius:10px;font-weight:bold
 .timeDisplay{font-size:22px;font-weight:bold;margin:10px 0;}
 .hidden{display:none}
 input,select{width:100%;padding:8px;margin:5px 0;border-radius:8px;border:none;}
-.small-btn{padding:5px;font-size:12px;margin-top:5px;width:auto;}
+.small-btn{padding:5px;font-size:12px;margin-top:5px;width:auto;margin-right:5px;}
 </style>
 </head>
 <body>
@@ -160,6 +160,29 @@ localStorage.setItem("athletes",JSON.stringify(athletes));
 renderAthletes();
 }
 
+function editAthlete(index){
+let a=athletes[index];
+
+let newUser=prompt("Editar nombre:",a.user);
+if(!newUser)return;
+
+let newPass=prompt("Editar contraseña:",a.pass);
+if(!newPass)return;
+
+let newAge=prompt("Editar edad:",a.age);
+let newSex=prompt("Editar sexo (Masculino/Femenino):",a.sex);
+
+athletes[index]={
+user:newUser,
+pass:newPass,
+age:newAge||"",
+sex:newSex||""
+};
+
+localStorage.setItem("athletes",JSON.stringify(athletes));
+renderAthletes();
+}
+
 function deleteAthlete(user){
 athletes=athletes.filter(a=>a.user!==user);
 localStorage.setItem("athletes",JSON.stringify(athletes));
@@ -179,11 +202,7 @@ function addManualTime(){
 if(!currentTest)return alert("Activa prueba");
 let athlete=manualAthlete.value;
 let time=parseFloat(manualTime.value)||0;
-currentTest.results.push({
-athlete,
-tiempoCronometro:0,
-tiempoManual:time
-});
+currentTest.results.push({athlete,tiempoCronometro:0,tiempoManual:time});
 localStorage.setItem("allTests",JSON.stringify(allTests));
 alert("Tiempo manual guardado");
 }
@@ -319,8 +338,9 @@ coachList.innerHTML+=`${c.user}
 function renderAthletes(){
 athleteList.innerHTML="";
 manualAthlete.innerHTML="";
-athletes.forEach(a=>{
+athletes.forEach((a,index)=>{
 athleteList.innerHTML+=`${a.user} | Edad: ${a.age||"-"} | Sexo: ${a.sex||"-"}
+<button class="small-btn btn-warning" onclick="editAthlete(${index})">Editar</button>
 <button class="small-btn btn-danger" onclick="deleteAthlete('${a.user}')">Eliminar</button><br>`;
 manualAthlete.innerHTML+=`<option value="${a.user}">${a.user}</option>`;
 });

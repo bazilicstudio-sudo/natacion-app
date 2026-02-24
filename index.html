@@ -17,7 +17,7 @@ button{padding:10px;margin:5px 0;border:none;border-radius:10px;font-weight:bold
 .timeDisplay{font-size:22px;font-weight:bold;margin:10px 0;}
 .hidden{display:none}
 input,select{width:100%;padding:8px;margin:5px 0;border-radius:8px;border:none;}
-.small-btn{padding:5px;font-size:12px;margin-top:5px;}
+.small-btn{padding:5px;font-size:12px;margin-top:5px;width:auto;}
 </style>
 </head>
 <body>
@@ -29,6 +29,7 @@ input,select{width:100%;padding:8px;margin:5px 0;border-radius:8px;border:none;}
 <input type="text" id="loginUser" placeholder="Usuario">
 <input type="password" id="loginPass" placeholder="Contraseña">
 <button class="btn" onclick="login()">Ingresar</button>
+<button class="btn-warning" onclick="restoreAccess()">Restaurar acceso</button>
 </div>
 
 <div id="app" class="hidden">
@@ -93,26 +94,29 @@ input,select{width:100%;padding:8px;margin:5px 0;border-radius:8px;border:none;}
 
 <script>
 
-let results=[];
-let laneTimers={};
-let globalStartTime=0;
-let globalInterval=null;
-let raceStarted=false;
-let paused=false;
-let pausedTime=0;
+function safeParse(key){
+try{return JSON.parse(localStorage.getItem(key))||[];}
+catch{return [];}
+}
 
-let coaches=JSON.parse(localStorage.getItem("coaches")||"[]");
-let athletes=JSON.parse(localStorage.getItem("athletes")||"[]");
-let allTests=JSON.parse(localStorage.getItem("allTests")||"[]");
+let coaches=safeParse("coaches");
+let athletes=safeParse("athletes");
+let allTests=safeParse("allTests");
 let currentTest=null;
 
-/* ADMIN AUTOMÁTICO */
-if(coaches.length===0){
+if(!coaches.find(c=>c.user==="admin")){
 coaches.push({user:"admin",pass:"1234"});
 localStorage.setItem("coaches",JSON.stringify(coaches));
 }
 
-/* LOGIN */
+function restoreAccess(){
+localStorage.removeItem("coaches");
+coaches=[{user:"admin",pass:"1234"}];
+localStorage.setItem("coaches",JSON.stringify(coaches));
+alert("Acceso restaurado\nUsuario: admin\nClave: 1234");
+location.reload();
+}
+
 function login(){
 let coach=coaches.find(c=>c.user===loginUser.value && c.pass===loginPass.value);
 if(!coach){alert("Usuario o contraseña incorrectos");return;}
@@ -123,30 +127,24 @@ renderAll();
 
 function logout(){location.reload();}
 
-/* ENTRENADORES */
 function createCoach(){
 if(!newCoachUser.value||!newCoachPass.value)return;
-if(coaches.find(c=>c.user===newCoachUser.value)){
-alert("Ese usuario ya existe");return;
-}
+if(coaches.find(c=>c.user===newCoachUser.value)){alert("Ya existe");return;}
 coaches.push({user:newCoachUser.value,pass:newCoachPass.value});
 localStorage.setItem("coaches",JSON.stringify(coaches));
 renderCoaches();
 }
 
 function deleteCoach(user){
-if(user==="admin"){alert("No puedes eliminar el admin principal");return;}
+if(user==="admin"){alert("No puedes eliminar admin");return;}
 coaches=coaches.filter(c=>c.user!==user);
 localStorage.setItem("coaches",JSON.stringify(coaches));
 renderCoaches();
 }
 
-/* ATLETAS */
 function createAthlete(){
 if(!newAthleteUser.value||!newAthletePass.value)return;
-if(athletes.find(a=>a.user===newAthleteUser.value)){
-alert("Ese atleta ya existe");return;
-}
+if(athletes.find(a=>a.user===newAthleteUser.value)){alert("Ya existe");return;}
 athletes.push({user:newAthleteUser.value,pass:newAthletePass.value});
 localStorage.setItem("athletes",JSON.stringify(athletes));
 renderAthletes();
@@ -158,7 +156,6 @@ localStorage.setItem("athletes",JSON.stringify(athletes));
 renderAthletes();
 }
 
-/* PRUEBAS */
 function activateTest(){
 if(!testName.value||!testDistance.value||!testDate.value)return;
 currentTest={name:testName.value,distance:testDistance.value,date:testDate.value,results:[]};
@@ -174,7 +171,6 @@ localStorage.setItem("allTests",JSON.stringify(allTests));
 renderTests();
 }
 
-/* TIEMPO MANUAL */
 function addManualTime(){
 if(!currentTest)return alert("Activa una prueba");
 let athlete=manualAthlete.value;
@@ -185,7 +181,14 @@ localStorage.setItem("allTests",JSON.stringify(allTests));
 alert("Tiempo manual guardado");
 }
 
-/* CRONÓMETRO */
+let results=[];
+let laneTimers={};
+let globalStartTime=0;
+let globalInterval=null;
+let raceStarted=false;
+let paused=false;
+let pausedTime=0;
+
 function startCompetition(){
 lanes.innerHTML="";
 results=[];
@@ -254,7 +257,6 @@ function pauseRace(){paused=true;pausedTime=Date.now();}
 function resumeRace(){paused=false;globalStartTime+=Date.now()-pausedTime;}
 function resetRace(){clearInterval(globalInterval);results=[];ranking.innerHTML="";}
 
-/* DESCARGA */
 function downloadResults(){
 let text="HISTORIAL COMPLETO\n\n";
 allTests.forEach(t=>{
@@ -303,9 +305,9 @@ renderCoaches();
 renderAthletes();
 renderTests();
 }
-  
 
 </script>
 </body>
 </html>
+
 

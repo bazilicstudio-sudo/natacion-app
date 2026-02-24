@@ -37,22 +37,6 @@ input,select{width:100%;padding:8px;margin:5px 0;border-radius:8px;border:none;}
 <button class="btn-danger" onclick="logout()">Cerrar Sesión</button>
 
 <div class="card">
-<h3>Entrenadores</h3>
-<input type="text" id="newCoachUser" placeholder="Nuevo entrenador">
-<input type="password" id="newCoachPass" placeholder="Contraseña">
-<button class="btn-success" onclick="createCoach()">Crear Entrenador</button>
-<div id="coachList"></div>
-</div>
-
-<div class="card">
-<h3>Atletas</h3>
-<input type="text" id="newAthleteUser" placeholder="Nuevo atleta">
-<input type="password" id="newAthletePass" placeholder="Contraseña">
-<button class="btn-success" onclick="createAthlete()">Crear Atleta</button>
-<div id="athleteList"></div>
-</div>
-
-<div class="card">
 <h3>📋 Datos de la Prueba</h3>
 <input type="text" id="testName" placeholder="Nombre prueba">
 <input type="number" id="testDistance" placeholder="Metros">
@@ -64,7 +48,7 @@ input,select{width:100%;padding:8px;margin:5px 0;border-radius:8px;border:none;}
 <div class="card">
 <h3>⏱ Agregar Tiempo Manual</h3>
 <select id="manualAthlete"></select>
-<input type="number" step="0.001" id="manualTime" placeholder="Tiempo en segundos">
+<input type="number" step="0.001" id="manualTime" placeholder="Tiempo manual en segundos">
 <button class="btn-warning" onclick="addManualTime()">Guardar Tiempo Manual</button>
 </div>
 
@@ -73,26 +57,20 @@ input,select{width:100%;padding:8px;margin:5px 0;border-radius:8px;border:none;}
 <input type="number" id="laneCount" value="4" min="2" max="10">
 <button class="btn-success" onclick="startCompetition()">Crear Carriles</button>
 <button class="btn-success" onclick="startRaceNow()">🚦 INICIAR</button>
-<button class="btn-warning" onclick="pauseRace()">⏸ Pausar</button>
-<button class="btn-success" onclick="resumeRace()">▶ Reanudar</button>
-<button class="btn-danger" onclick="resetRace()">🔄 Reiniciar</button>
 <div id="lanes"></div>
 </div>
 
 <div class="card">
-<h3>Ranking</h3>
+<h3>Resultados</h3>
 <div id="ranking"></div>
 <button class="btn" onclick="downloadResults()">Descargar Historial Completo</button>
-</div>
-
-<div class="card">
-<h3>Pruebas Guardadas</h3>
-<div id="testList"></div>
 </div>
 
 </div>
 
 <script>
+
+/* ================= BASE SEGURA ================= */
 
 function safeParse(key){
 try{return JSON.parse(localStorage.getItem(key))||[];}
@@ -105,7 +83,7 @@ let allTests=safeParse("allTests");
 let currentTest=null;
 
 if(!coaches.find(c=>c.user==="admin")){
-coaches.push({user:"admin",pass:"1234"});
+coaches=[{user:"admin",pass:"1234"}];
 localStorage.setItem("coaches",JSON.stringify(coaches));
 }
 
@@ -113,99 +91,78 @@ function restoreAccess(){
 localStorage.removeItem("coaches");
 coaches=[{user:"admin",pass:"1234"}];
 localStorage.setItem("coaches",JSON.stringify(coaches));
-alert("Acceso restaurado\nUsuario: admin\nClave: 1234");
+alert("Usuario: admin | Clave: 1234");
 location.reload();
 }
 
 function login(){
 let coach=coaches.find(c=>c.user===loginUser.value && c.pass===loginPass.value);
-if(!coach){alert("Usuario o contraseña incorrectos");return;}
+if(!coach){alert("Usuario incorrecto");return;}
 loginCard.classList.add("hidden");
 app.classList.remove("hidden");
-renderAll();
 }
 
 function logout(){location.reload();}
 
-function createCoach(){
-if(!newCoachUser.value||!newCoachPass.value)return;
-if(coaches.find(c=>c.user===newCoachUser.value)){alert("Ya existe");return;}
-coaches.push({user:newCoachUser.value,pass:newCoachPass.value});
-localStorage.setItem("coaches",JSON.stringify(coaches));
-renderCoaches();
-}
-
-function deleteCoach(user){
-if(user==="admin"){alert("No puedes eliminar admin");return;}
-coaches=coaches.filter(c=>c.user!==user);
-localStorage.setItem("coaches",JSON.stringify(coaches));
-renderCoaches();
-}
-
-function createAthlete(){
-if(!newAthleteUser.value||!newAthletePass.value)return;
-if(athletes.find(a=>a.user===newAthleteUser.value)){alert("Ya existe");return;}
-athletes.push({user:newAthleteUser.value,pass:newAthletePass.value});
-localStorage.setItem("athletes",JSON.stringify(athletes));
-renderAthletes();
-}
-
-function deleteAthlete(user){
-athletes=athletes.filter(a=>a.user!==user);
-localStorage.setItem("athletes",JSON.stringify(athletes));
-renderAthletes();
-}
+/* ================= PRUEBAS ================= */
 
 function activateTest(){
 if(!testName.value||!testDistance.value||!testDate.value)return;
-currentTest={name:testName.value,distance:testDistance.value,date:testDate.value,results:[]};
+currentTest={
+name:testName.value,
+distance:testDistance.value,
+date:testDate.value,
+results:[]
+};
 allTests.push(currentTest);
 localStorage.setItem("allTests",JSON.stringify(allTests));
 activeTestInfo.innerHTML=`Activa: ${currentTest.name} - ${currentTest.distance}m`;
-renderTests();
 }
 
-function deleteTest(index){
-allTests.splice(index,1);
-localStorage.setItem("allTests",JSON.stringify(allTests));
-renderTests();
-}
+/* ================= MANUAL ================= */
 
 function addManualTime(){
 if(!currentTest)return alert("Activa una prueba");
+
 let athlete=manualAthlete.value;
-let time=parseFloat(manualTime.value);
-if(!athlete||!time)return;
-currentTest.results.push({athlete,time});
-localStorage.setItem("allTests",JSON.stringify(allTests));
-alert("Tiempo manual guardado");
+let manual=parseFloat(manualTime.value);
+
+if(!athlete)return;
+
+/* BUSCAR SI YA EXISTE */
+let existing=currentTest.results.find(r=>r.athlete===athlete);
+
+if(existing){
+existing.manualTime=manual;
+}else{
+currentTest.results.push({
+athlete:athlete,
+chronoTime:0,
+manualTime:manual
+});
 }
 
-let results=[];
+localStorage.setItem("allTests",JSON.stringify(allTests));
+alert("Tiempo manual guardado");
+renderRanking();
+}
+
+/* ================= CRONOMETRO ================= */
+
 let laneTimers={};
 let globalStartTime=0;
-let globalInterval=null;
 let raceStarted=false;
-let paused=false;
-let pausedTime=0;
 
 function startCompetition(){
 lanes.innerHTML="";
-results=[];
 laneTimers={};
-clearInterval(globalInterval);
-raceStarted=false;
-paused=false;
 
 for(let i=1;i<=laneCount.value;i++){
 laneTimers[i]={finished:false,currentTime:0,athlete:null};
-let options=athletes.map(a=>`<option value="${a.user}">${a.user}</option>`).join("");
 lanes.innerHTML+=`
 <div class="lane">
 Carril ${i}
-<select onchange="laneTimers[${i}].athlete=this.value">
-<option value="">Asignar</option>${options}
-</select>
+<input placeholder="Nombre atleta" onchange="laneTimers[${i}].athlete=this.value">
 <div class="timeDisplay" id="time${i}">0.000</div>
 <button onclick="finishLane(${i})">TOCAR</button>
 </div>`;
@@ -213,15 +170,13 @@ Carril ${i}
 }
 
 function startRaceNow(){
-if(raceStarted)return;
 raceStarted=true;
-paused=false;
 globalStartTime=Date.now();
-globalInterval=setInterval(updateTimers,10);
+setInterval(updateTimers,10);
 }
 
 function updateTimers(){
-if(paused)return;
+if(!raceStarted)return;
 let now=Date.now();
 for(let i in laneTimers){
 if(!laneTimers[i].finished){
@@ -233,81 +188,64 @@ document.getElementById("time"+i).innerText=(elapsed/1000).toFixed(3);
 }
 
 function finishLane(i){
-if(!raceStarted||laneTimers[i].finished)return;
+if(laneTimers[i].finished)return;
 laneTimers[i].finished=true;
-let finalTime=laneTimers[i].currentTime/1000;
-let athleteName=laneTimers[i].athlete||"Sin atleta";
-results.push({lane:i,name:athleteName,time:finalTime});
-if(currentTest){
-currentTest.results.push({athlete:athleteName,time:finalTime});
-localStorage.setItem("allTests",JSON.stringify(allTests));
-}
-renderRanking();
-}
 
-function renderRanking(){
-ranking.innerHTML="";
-results.sort((a,b)=>a.time-b.time);
-results.forEach((r,i)=>{
-ranking.innerHTML+=`${i+1}° ${r.name} - ${r.time.toFixed(3)}s<br>`;
+let athlete=laneTimers[i].athlete||"Sin atleta";
+let chrono=(laneTimers[i].currentTime/1000);
+
+/* BUSCAR SI YA EXISTE */
+let existing=currentTest.results.find(r=>r.athlete===athlete);
+
+if(existing){
+existing.chronoTime=chrono;
+}else{
+currentTest.results.push({
+athlete:athlete,
+chronoTime:chrono,
+manualTime:0
 });
 }
 
-function pauseRace(){paused=true;pausedTime=Date.now();}
-function resumeRace(){paused=false;globalStartTime+=Date.now()-pausedTime;}
-function resetRace(){clearInterval(globalInterval);results=[];ranking.innerHTML="";}
+localStorage.setItem("allTests",JSON.stringify(allTests));
+renderRanking();
+}
+
+/* ================= RANKING ================= */
+
+function renderRanking(){
+if(!currentTest)return;
+ranking.innerHTML="";
+currentTest.results.forEach(r=>{
+ranking.innerHTML+=`
+${r.athlete} 
+| Crono: ${r.chronoTime.toFixed(3)}s 
+| Manual: ${r.manualTime.toFixed(3)}s<br>`;
+});
+}
+
+/* ================= DESCARGA ================= */
 
 function downloadResults(){
-let text="HISTORIAL COMPLETO\n\n";
+let text="";
 allTests.forEach(t=>{
-text+="============================\n";
-text+=`Prueba: ${t.name}\nDistancia: ${t.distance}m\nFecha: ${t.date}\n\n`;
+text+="====================\n";
+text+=`${t.name} - ${t.distance}m - ${t.date}\n\n`;
 t.results.forEach(r=>{
-text+=`${r.athlete} - ${r.time.toFixed(3)}s\n`;
+text+=`${r.athlete} | Crono: ${r.chronoTime}s | Manual: ${r.manualTime}s\n`;
 });
 text+="\n";
 });
 let blob=new Blob([text],{type:"text/plain"});
 let a=document.createElement("a");
 a.href=URL.createObjectURL(blob);
-a.download="historial_completo.txt";
+a.download="historial.txt";
 a.click();
-}
-
-function renderCoaches(){
-coachList.innerHTML="";
-coaches.forEach(c=>{
-coachList.innerHTML+=`${c.user}
-<button class="small-btn btn-danger" onclick="deleteCoach('${c.user}')">Eliminar</button><br>`;
-});
-}
-
-function renderAthletes(){
-athleteList.innerHTML="";
-manualAthlete.innerHTML="";
-athletes.forEach(a=>{
-athleteList.innerHTML+=`${a.user}
-<button class="small-btn btn-danger" onclick="deleteAthlete('${a.user}')">Eliminar</button><br>`;
-manualAthlete.innerHTML+=`<option value="${a.user}">${a.user}</option>`;
-});
-}
-
-function renderTests(){
-testList.innerHTML="";
-allTests.forEach((t,i)=>{
-testList.innerHTML+=`${t.name} - ${t.distance}m - ${t.date}
-<button class="small-btn btn-danger" onclick="deleteTest(${i})">Eliminar</button><br>`;
-});
-}
-
-function renderAll(){
-renderCoaches();
-renderAthletes();
-renderTests();
 }
 
 </script>
 </body>
 </html>
+
 
 

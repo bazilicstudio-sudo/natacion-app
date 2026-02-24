@@ -29,11 +29,20 @@ input,select{width:100%;padding:8px;margin:5px 0;border-radius:8px;border:none;}
 <input type="text" id="loginUser" placeholder="Usuario">
 <input type="password" id="loginPass" placeholder="Contraseña">
 <button class="btn" onclick="login()">Ingresar</button>
+<button class="btn-warning" onclick="restoreAccess()">Restaurar acceso</button>
 </div>
 
 <div id="app" class="hidden">
 
 <button class="btn-danger" onclick="logout()">Cerrar Sesión</button>
+
+<div class="card">
+<h3>Entrenadores</h3>
+<input type="text" id="newCoachUser" placeholder="Nuevo entrenador">
+<input type="password" id="newCoachPass" placeholder="Contraseña">
+<button class="btn-success" onclick="createCoach()">Crear Entrenador</button>
+<div id="coachList"></div>
+</div>
 
 <div class="card">
 <h3>Atletas</h3>
@@ -46,7 +55,6 @@ input,select{width:100%;padding:8px;margin:5px 0;border-radius:8px;border:none;}
 <option value="Femenino">Femenino</option>
 </select>
 <button class="btn-success" onclick="createAthlete()">Crear Atleta</button>
-<button class="btn" onclick="downloadAthletes()">Descargar Todos los Atletas</button>
 <div id="athleteList"></div>
 </div>
 
@@ -57,6 +65,13 @@ input,select{width:100%;padding:8px;margin:5px 0;border-radius:8px;border:none;}
 <input type="date" id="testDate">
 <button class="btn-success" onclick="activateTest()">Activar Prueba</button>
 <div id="activeTestInfo"></div>
+</div>
+
+<div class="card">
+<h3>⏱ Agregar Tiempo Manual</h3>
+<select id="manualAthlete"></select>
+<input type="number" step="0.001" id="manualTime" placeholder="Tiempo en segundos">
+<button class="btn-warning" onclick="addManualTime()">Guardar Tiempo Manual</button>
 </div>
 
 <div class="card">
@@ -73,104 +88,65 @@ input,select{width:100%;padding:8px;margin:5px 0;border-radius:8px;border:none;}
 <div class="card">
 <h3>Ranking</h3>
 <div id="ranking"></div>
+<button class="btn" onclick="downloadResults()">Descargar Historial Completo</button>
 </div>
 
 <div class="card">
-<h3>Descargas de Pruebas</h3>
-<button class="btn" onclick="downloadResults()">Descargar Historial Completo</button>
-
-<h4>Descargar por Rango de Fechas</h4>
+<h3>Descargar por Fechas</h3>
 <input type="date" id="dateFrom">
 <input type="date" id="dateTo">
-<button class="btn" onclick="downloadByDate()">Descargar por Rango</button>
+<button class="btn-success" onclick="downloadByDate()">Descargar por Rango</button>
+</div>
+
+<div class="card">
+<h3>Pruebas Guardadas</h3>
+<div id="testList"></div>
 </div>
 
 </div>
 
 <script>
 
+/* ======================
+   SISTEMA BASE ORIGINAL
+====================== */
+
 function safeParse(key){
 try{return JSON.parse(localStorage.getItem(key))||[];}
 catch{return [];}
 }
 
+let coaches=safeParse("coaches");
 let athletes=safeParse("athletes");
 let allTests=safeParse("allTests");
 let currentTest=null;
 
+if(!coaches.find(c=>c.user==="admin")){
+coaches.push({user:"admin",pass:"1234"});
+localStorage.setItem("coaches",JSON.stringify(coaches));
+}
+
+function restoreAccess(){
+localStorage.removeItem("coaches");
+coaches=[{user:"admin",pass:"1234"}];
+localStorage.setItem("coaches",JSON.stringify(coaches));
+alert("Usuario: admin\nClave: 1234");
+location.reload();
+}
+
 function login(){
+let coach=coaches.find(c=>c.user===loginUser.value && c.pass===loginPass.value);
+if(!coach){alert("Incorrecto");return;}
 loginCard.classList.add("hidden");
 app.classList.remove("hidden");
-renderAthletes();
+renderAll();
 }
 
 function logout(){location.reload();}
 
-/* ATLETAS */
-
-function createAthlete(){
-if(!newAthleteUser.value||!newAthletePass.value)return;
-athletes.push({
-user:newAthleteUser.value,
-pass:newAthletePass.value,
-age:newAthleteAge.value||"",
-sex:newAthleteSex.value||""
-});
-localStorage.setItem("athletes",JSON.stringify(athletes));
-renderAthletes();
-}
-
-function editAthlete(index){
-let a=athletes[index];
-let newUser=prompt("Editar nombre:",a.user);
-if(!newUser)return;
-let newPass=prompt("Editar contraseña:",a.pass);
-let newAge=prompt("Editar edad:",a.age);
-let newSex=prompt("Editar sexo:",a.sex);
-
-athletes[index]={user:newUser,pass:newPass,age:newAge||"",sex:newSex||""};
-localStorage.setItem("athletes",JSON.stringify(athletes));
-renderAthletes();
-}
-
-function deleteAthlete(user){
-athletes=athletes.filter(a=>a.user!==user);
-localStorage.setItem("athletes",JSON.stringify(athletes));
-renderAthletes();
-}
-
-function renderAthletes(){
-athleteList.innerHTML="";
-athletes.forEach((a,index)=>{
-athleteList.innerHTML+=`${a.user} | Edad: ${a.age||"-"} | Sexo: ${a.sex||"-"}
-<button class="small-btn btn-warning" onclick="editAthlete(${index})">Editar</button>
-<button class="small-btn btn-danger" onclick="deleteAthlete('${a.user}')">Eliminar</button><br>`;
-});
-}
-
-function downloadAthletes(){
-let text="LISTA DE ATLETAS\n\n";
-athletes.forEach(a=>{
-text+=`Nombre: ${a.user}\nEdad: ${a.age||"-"}\nSexo: ${a.sex||"-"}\n\n`;
-});
-let blob=new Blob([text],{type:"text/plain"});
-let a=document.createElement("a");
-a.href=URL.createObjectURL(blob);
-a.download="atletas.txt";
-a.click();
-}
-
-/* PRUEBAS */
-
-function activateTest(){
-if(!testName.value||!testDistance.value||!testDate.value)return;
-currentTest={name:testName.value,distance:testDistance.value,date:testDate.value,results:[]};
-allTests.push(currentTest);
-localStorage.setItem("allTests",JSON.stringify(allTests));
-activeTestInfo.innerHTML=`Activa: ${currentTest.name} - ${currentTest.distance}m`;
-}
-
-/* CRONOMETRO */
+/* ======================
+   CRONOMETRO ESTABLE
+====================== */
 
 let results=[];
 let laneTimers={};
@@ -191,9 +167,13 @@ elapsed=0;
 
 for(let i=1;i<=laneCount.value;i++){
 laneTimers[i]={finished:false,currentTime:0,athlete:null};
+let options=athletes.map(a=>`<option value="${a.user}">${a.user}</option>`).join("");
 lanes.innerHTML+=`
 <div class="lane">
 Carril ${i}
+<select onchange="laneTimers[${i}].athlete=this.value">
+<option value="">Asignar</option>${options}
+</select>
 <div class="timeDisplay" id="time${i}">0.000</div>
 <button onclick="finishLane(${i})">TOCAR</button>
 </div>`;
@@ -235,6 +215,8 @@ paused=false;
 startTime=Date.now();
 }
 
+/* 🔥 REINICIAR PROFESIONAL SIN BORRAR CARRILES */
+
 function resetRace(){
 clearInterval(globalInterval);
 raceStarted=false;
@@ -242,6 +224,7 @@ paused=false;
 elapsed=0;
 results=[];
 ranking.innerHTML="";
+
 for(let i in laneTimers){
 laneTimers[i].finished=false;
 laneTimers[i].currentTime=0;
@@ -249,52 +232,11 @@ document.getElementById("time"+i).innerText="0.000";
 }
 }
 
-function finishLane(i){
-if(!raceStarted||laneTimers[i].finished)return;
-laneTimers[i].finished=true;
-let finalTime=laneTimers[i].currentTime/1000;
-results.push({lane:i,time:finalTime});
-if(currentTest){
-currentTest.results.push({
-athlete:"Carril "+i,
-tiempoCronometro:finalTime,
-tiempoManual:0
-});
-localStorage.setItem("allTests",JSON.stringify(allTests));
-}
-renderRanking();
-}
-
-function renderRanking(){
-ranking.innerHTML="";
-results.sort((a,b)=>a.time-b.time);
-results.forEach((r,i)=>{
-ranking.innerHTML+=`${i+1}° Carril ${r.lane} - ${r.time.toFixed(3)}s<br>`;
-});
-}
-
-/* DESCARGAS */
-
-function downloadResults(){
-let text="HISTORIAL COMPLETO\n\n";
-allTests.forEach(t=>{
-text+=`Fecha: ${t.date}\nPrueba: ${t.name}\n\n`;
-t.results.forEach(r=>{
-let cron=r.tiempoCronometro||0;
-let man=r.tiempoManual||0;
-text+=`${r.athlete} - Crono:${cron.toFixed(3)} - Manual:${man.toFixed(3)}\n`;
-});
-text+="\n";
-});
-let blob=new Blob([text],{type:"text/plain"});
-let a=document.createElement("a");
-a.href=URL.createObjectURL(blob);
-a.download="historial_completo.txt";
-a.click();
-}
+/* ======================
+   DESCARGA POR FECHAS
+====================== */
 
 function downloadByDate(){
-
 let from=dateFrom.value;
 let to=dateTo.value;
 if(!from||!to)return alert("Selecciona rango");
@@ -308,7 +250,7 @@ if(!grouped[t.date])grouped[t.date]=[];
 grouped[t.date].push(t);
 });
 
-let text="HISTORIAL POR FECHAS\n\n";
+let text="HISTORIAL POR RANGO\n\n";
 
 Object.keys(grouped).sort().forEach(date=>{
 text+="============================\n";
@@ -319,7 +261,7 @@ text+="Prueba: "+test.name+"\n";
 test.results.forEach(r=>{
 let cron=r.tiempoCronometro||0;
 let man=r.tiempoManual||0;
-text+=`${r.athlete} - Crono:${cron.toFixed(3)} - Manual:${man.toFixed(3)}\n`;
+text+=`${r.athlete} - Crono: ${cron.toFixed(3)}s - Manual: ${man.toFixed(3)}s\n`;
 });
 text+="\n";
 });

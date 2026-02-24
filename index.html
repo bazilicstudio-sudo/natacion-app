@@ -16,8 +16,7 @@ button{padding:10px;margin:5px 0;border:none;border-radius:10px;font-weight:bold
 .lane{background:#111827;padding:15px;margin:10px 0;border-radius:15px;text-align:center;}
 .timeDisplay{font-size:22px;font-weight:bold;margin:10px 0;}
 .hidden{display:none}
-input,select{width:100%;padding:8px;margin:5px 0;border-radius:8px;border:none;}
-.small-btn{padding:5px;font-size:12px;margin-top:5px;width:auto;}
+input{width:100%;padding:8px;margin:5px 0;border-radius:8px;border:none;}
 </style>
 </head>
 <body>
@@ -46,8 +45,8 @@ input,select{width:100%;padding:8px;margin:5px 0;border-radius:8px;border:none;}
 </div>
 
 <div class="card">
-<h3>⏱ Agregar Tiempo Manual</h3>
-<select id="manualAthlete"></select>
+<h3>⏱ Tiempo Manual</h3>
+<input type="text" id="manualAthlete" placeholder="Nombre atleta">
 <input type="number" step="0.001" id="manualTime" placeholder="Tiempo manual en segundos">
 <button class="btn-warning" onclick="addManualTime()">Guardar Tiempo Manual</button>
 </div>
@@ -57,20 +56,23 @@ input,select{width:100%;padding:8px;margin:5px 0;border-radius:8px;border:none;}
 <input type="number" id="laneCount" value="4" min="2" max="10">
 <button class="btn-success" onclick="startCompetition()">Crear Carriles</button>
 <button class="btn-success" onclick="startRaceNow()">🚦 INICIAR</button>
+<button class="btn-warning" onclick="pauseRace()">⏸ Pausar</button>
+<button class="btn-success" onclick="resumeRace()">▶ Reanudar</button>
+<button class="btn-danger" onclick="resetRace()">🔄 Reiniciar</button>
 <div id="lanes"></div>
 </div>
 
 <div class="card">
 <h3>Resultados</h3>
 <div id="ranking"></div>
-<button class="btn" onclick="downloadResults()">Descargar Historial Completo</button>
+<button class="btn" onclick="downloadResults()">Descargar Historial</button>
 </div>
 
 </div>
 
 <script>
 
-/* ================= BASE SEGURA ================= */
+/* ================== BASE SEGURA ================== */
 
 function safeParse(key){
 try{return JSON.parse(localStorage.getItem(key))||[];}
@@ -78,7 +80,6 @@ catch{return [];}
 }
 
 let coaches=safeParse("coaches");
-let athletes=safeParse("athletes");
 let allTests=safeParse("allTests");
 let currentTest=null;
 
@@ -104,7 +105,7 @@ app.classList.remove("hidden");
 
 function logout(){location.reload();}
 
-/* ================= PRUEBAS ================= */
+/* ================== PRUEBAS ================== */
 
 function activateTest(){
 if(!testName.value||!testDistance.value||!testDate.value)return;
@@ -119,43 +120,49 @@ localStorage.setItem("allTests",JSON.stringify(allTests));
 activeTestInfo.innerHTML=`Activa: ${currentTest.name} - ${currentTest.distance}m`;
 }
 
-/* ================= MANUAL ================= */
+/* ================== MANUAL ================== */
 
 function addManualTime(){
 if(!currentTest)return alert("Activa una prueba");
 
-let athlete=manualAthlete.value;
+let athlete=manualAthlete.value.trim();
 let manual=parseFloat(manualTime.value);
 
 if(!athlete)return;
 
-/* BUSCAR SI YA EXISTE */
 let existing=currentTest.results.find(r=>r.athlete===athlete);
 
 if(existing){
-existing.manualTime=manual;
+existing.manualTime=manual || 0;
 }else{
 currentTest.results.push({
 athlete:athlete,
 chronoTime:0,
-manualTime:manual
+manualTime:manual || 0
 });
 }
 
 localStorage.setItem("allTests",JSON.stringify(allTests));
-alert("Tiempo manual guardado");
 renderRanking();
 }
 
-/* ================= CRONOMETRO ================= */
+/* ================== CRONOMETRO PRO ================== */
 
 let laneTimers={};
 let globalStartTime=0;
+let globalInterval=null;
 let raceStarted=false;
+let paused=false;
+let pausedAt=0;
+let totalPausedTime=0;
 
 function startCompetition(){
 lanes.innerHTML="";
 laneTimers={};
+clearInterval(globalInterval);
+raceStarted=false;
+paused=false;
+totalPausedTime=0;
 
 for(let i=1;i<=laneCount.value;i++){
 laneTimers[i]={finished:false,currentTime:0,athlete:null};
@@ -170,31 +177,59 @@ Carril ${i}
 }
 
 function startRaceNow(){
+if(raceStarted)return;
 raceStarted=true;
+paused=false;
+totalPausedTime=0;
 globalStartTime=Date.now();
-setInterval(updateTimers,10);
+globalInterval=setInterval(updateTimers,10);
 }
 
 function updateTimers(){
-if(!raceStarted)return;
+if(!raceStarted||paused)return;
+
 let now=Date.now();
+let realElapsed=now-globalStartTime-totalPausedTime;
+
 for(let i in laneTimers){
 if(!laneTimers[i].finished){
-let elapsed=now-globalStartTime;
-laneTimers[i].currentTime=elapsed;
-document.getElementById("time"+i).innerText=(elapsed/1000).toFixed(3);
+laneTimers[i].currentTime=realElapsed;
+document.getElementById("time"+i).innerText=(realElapsed/1000).toFixed(3);
 }
 }
 }
 
+function pauseRace(){
+if(!raceStarted||paused)return;
+paused=true;
+pausedAt=Date.now();
+}
+
+function resumeRace(){
+if(!raceStarted||!paused)return;
+paused=false;
+totalPausedTime+=Date.now()-pausedAt;
+}
+
+function resetRace(){
+clearInterval(globalInterval);
+raceStarted=false;
+paused=false;
+laneTimers={};
+lanes.innerHTML="";
+}
+
+/* ================== FINALIZAR ================== */
+
 function finishLane(i){
+if(!currentTest)return alert("Activa una prueba");
 if(laneTimers[i].finished)return;
+
 laneTimers[i].finished=true;
 
 let athlete=laneTimers[i].athlete||"Sin atleta";
-let chrono=(laneTimers[i].currentTime/1000);
+let chrono=(laneTimers[i].currentTime/1000)||0;
 
-/* BUSCAR SI YA EXISTE */
 let existing=currentTest.results.find(r=>r.athlete===athlete);
 
 if(existing){
@@ -211,7 +246,7 @@ localStorage.setItem("allTests",JSON.stringify(allTests));
 renderRanking();
 }
 
-/* ================= RANKING ================= */
+/* ================== RANKING ================== */
 
 function renderRanking(){
 if(!currentTest)return;
@@ -224,7 +259,7 @@ ${r.athlete}
 });
 }
 
-/* ================= DESCARGA ================= */
+/* ================== DESCARGA ================== */
 
 function downloadResults(){
 let text="";
@@ -246,6 +281,5 @@ a.click();
 </script>
 </body>
 </html>
-
 
 

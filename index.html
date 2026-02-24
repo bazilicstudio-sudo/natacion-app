@@ -162,23 +162,14 @@ renderAthletes();
 
 function editAthlete(index){
 let a=athletes[index];
-
 let newUser=prompt("Editar nombre:",a.user);
 if(!newUser)return;
-
 let newPass=prompt("Editar contraseña:",a.pass);
 if(!newPass)return;
-
 let newAge=prompt("Editar edad:",a.age);
 let newSex=prompt("Editar sexo (Masculino/Femenino):",a.sex);
 
-athletes[index]={
-user:newUser,
-pass:newPass,
-age:newAge||"",
-sex:newSex||""
-};
-
+athletes[index]={user:newUser,pass:newPass,age:newAge||"",sex:newSex||""};
 localStorage.setItem("athletes",JSON.stringify(athletes));
 renderAthletes();
 }
@@ -207,14 +198,17 @@ localStorage.setItem("allTests",JSON.stringify(allTests));
 alert("Tiempo manual guardado");
 }
 
+/* =========================
+   CRONOMETRO PROFESIONAL
+========================= */
+
 let results=[];
 let laneTimers={};
-let globalStartTime=0;
 let globalInterval=null;
 let raceStarted=false;
 let paused=false;
-let totalPausedTime=0;
-let pauseStart=0;
+let startTime=0;
+let elapsed=0;
 
 function startCompetition(){
 lanes.innerHTML="";
@@ -223,7 +217,7 @@ laneTimers={};
 clearInterval(globalInterval);
 raceStarted=false;
 paused=false;
-totalPausedTime=0;
+elapsed=0;
 
 for(let i=1;i<=laneCount.value;i++){
 laneTimers[i]={finished:false,currentTime:0,athlete:null};
@@ -243,20 +237,45 @@ Carril ${i}
 function startRaceNow(){
 if(raceStarted)return;
 raceStarted=true;
-globalStartTime=Date.now();
+paused=false;
+startTime=Date.now();
 globalInterval=setInterval(updateTimers,10);
 }
 
 function updateTimers(){
-if(paused)return;
-let now=Date.now();
+if(!raceStarted)return;
+
+let currentElapsed = paused
+? elapsed
+: elapsed + (Date.now() - startTime);
+
 for(let i in laneTimers){
 if(!laneTimers[i].finished){
-let elapsed=now-globalStartTime-totalPausedTime;
-laneTimers[i].currentTime=elapsed;
-document.getElementById("time"+i).innerText=(elapsed/1000).toFixed(3);
+laneTimers[i].currentTime=currentElapsed;
+document.getElementById("time"+i).innerText=(currentElapsed/1000).toFixed(3);
 }
 }
+}
+
+function pauseRace(){
+if(!raceStarted || paused)return;
+paused=true;
+elapsed += Date.now() - startTime;
+}
+
+function resumeRace(){
+if(!paused)return;
+paused=false;
+startTime=Date.now();
+}
+
+function resetRace(){
+clearInterval(globalInterval);
+results=[];
+ranking.innerHTML="";
+raceStarted=false;
+paused=false;
+elapsed=0;
 }
 
 function finishLane(i){
@@ -285,27 +304,6 @@ results.sort((a,b)=>a.time-b.time);
 results.forEach((r,i)=>{
 ranking.innerHTML+=`${i+1}° ${r.name} - ${r.time.toFixed(3)}s<br>`;
 });
-}
-
-function pauseRace(){
-if(!raceStarted||paused)return;
-paused=true;
-pauseStart=Date.now();
-}
-
-function resumeRace(){
-if(!paused)return;
-paused=false;
-totalPausedTime+=Date.now()-pauseStart;
-}
-
-function resetRace(){
-clearInterval(globalInterval);
-results=[];
-ranking.innerHTML="";
-raceStarted=false;
-paused=false;
-totalPausedTime=0;
 }
 
 function downloadResults(){

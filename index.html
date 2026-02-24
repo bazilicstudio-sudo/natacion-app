@@ -38,6 +38,7 @@ input,select{width:100%;padding:8px;margin:5px 0;border-radius:8px;border:none;}
 
 <div class="card">
 <h3>Atletas</h3>
+
 <input type="text" id="newAthleteUser" placeholder="Nombre atleta">
 <input type="password" id="newAthletePass" placeholder="Contraseña">
 <input type="number" id="newAthleteAge" placeholder="Edad">
@@ -46,7 +47,9 @@ input,select{width:100%;padding:8px;margin:5px 0;border-radius:8px;border:none;}
 <option value="Masculino">Masculino</option>
 <option value="Femenino">Femenino</option>
 </select>
+
 <button class="btn-success" onclick="createAthlete()">Crear Atleta</button>
+
 <div id="athleteList"></div>
 </div>
 
@@ -80,7 +83,7 @@ Descargar Historial Individual
 
 <script>
 
-/* ====================== BASE ====================== */
+/* ================= BASE ================= */
 
 function safeParse(key){
 try{return JSON.parse(localStorage.getItem(key))||[];}
@@ -90,7 +93,7 @@ catch{return [];}
 let athletes=safeParse("athletes");
 let athleteHistory=safeParse("athleteHistory");
 
-/* ====================== LOGIN SIMPLE ====================== */
+/* ================= LOGIN ================= */
 
 function login(){
 loginCard.classList.add("hidden");
@@ -101,32 +104,65 @@ renderAll();
 function logout(){location.reload();}
 function restoreAccess(){alert("Sistema restaurado");}
 
-/* ====================== ATLETAS ====================== */
+/* ================= ATLETAS ================= */
 
 function createAthlete(){
 if(!newAthleteUser.value)return;
+
 athletes.push({
 user:newAthleteUser.value,
 pass:newAthletePass.value,
 age:newAthleteAge.value,
 sex:newAthleteSex.value
 });
+
 localStorage.setItem("athletes",JSON.stringify(athletes));
 renderAll();
+clearInputs();
+}
+
+function clearInputs(){
 newAthleteUser.value="";
+newAthletePass.value="";
+newAthleteAge.value="";
+newAthleteSex.value="";
+}
+
+function editAthlete(index){
+let a=athletes[index];
+newAthleteUser.value=a.user;
+newAthletePass.value=a.pass;
+newAthleteAge.value=a.age;
+newAthleteSex.value=a.sex;
+
+deleteAthlete(index);
+}
+
+function deleteAthlete(index){
+if(!confirm("¿Eliminar atleta?"))return;
+athletes.splice(index,1);
+localStorage.setItem("athletes",JSON.stringify(athletes));
+renderAll();
 }
 
 function renderAll(){
 athleteList.innerHTML="";
 historyAthlete.innerHTML="";
 
-athletes.forEach(a=>{
-athleteList.innerHTML+=`<div>${a.user}</div>`;
+athletes.forEach((a,i)=>{
+athleteList.innerHTML+=`
+<div>
+<b>${a.user}</b> | Edad: ${a.age||"-"} | Sexo: ${a.sex||"-"}
+<br>
+<button class="small-btn btn-warning" onclick="editAthlete(${i})">Editar</button>
+<button class="small-btn btn-danger" onclick="deleteAthlete(${i})">Eliminar</button>
+<hr>
+</div>`;
 historyAthlete.innerHTML+=`<option value="${a.user}">${a.user}</option>`;
 });
 }
 
-/* ====================== CRONOMETRO ====================== */
+/* ================= CRONOMETRO ================= */
 
 let laneTimers={};
 let globalInterval=null;
@@ -204,11 +240,10 @@ document.getElementById("time"+i).innerText="0.000";
 }
 }
 
-/* ====================== FINALIZAR CARRIL ====================== */
+/* ================= FINALIZAR ================= */
 
 function finishLane(lane){
 if(laneTimers[lane].finished)return;
-
 laneTimers[lane].finished=true;
 
 if(laneTimers[lane].athlete){
@@ -224,7 +259,7 @@ localStorage.setItem("athleteHistory",JSON.stringify(athleteHistory));
 }
 }
 
-/* ====================== HISTORIAL PRO ====================== */
+/* ================= HISTORIAL ORDENADO ================= */
 
 function downloadAthleteHistory(){
 
@@ -242,7 +277,8 @@ if(!grouped[key])grouped[key]=[];
 grouped[key].push(r);
 });
 
-let text=`HISTORIAL DE ${selected}\n\n`;
+let text=`HISTORIAL COMPLETO\n`;
+text+=`Atleta: ${selected}\n\n`;
 
 Object.keys(grouped)
 .sort((a,b)=>parseInt(a)-parseInt(b))
@@ -252,24 +288,19 @@ let pruebas=grouped[dist];
 pruebas.sort((a,b)=>new Date(a.date)-new Date(b.date));
 
 text+="=================================\n";
-text+=`DISTANCIA: ${dist}\n`;
-text+="=================================\n\n";
+text+=`PRUEBA: ${dist}\n`;
+text+="=================================\n";
 
 let suma=0;
-let mejor=Infinity;
 
 pruebas.forEach(r=>{
-let tiempo=parseFloat(r.time)||0;
-suma+=tiempo;
-if(tiempo<mejor)mejor=tiempo;
-text+=`Fecha: ${r.date}  |  Tiempo: ${tiempo.toFixed(3)}s\n`;
+suma+=r.time;
+text+=`Fecha: ${r.date} | Tiempo: ${r.time.toFixed(3)}s\n`;
 });
 
 let promedio=suma/pruebas.length;
 
-text+="\n";
-text+=`Promedio ${dist}: ${promedio.toFixed(3)}s\n`;
-text+=`Mejor marca ${dist}: ${mejor.toFixed(3)}s\n\n\n`;
+text+=`\nPromedio ${dist}: ${promedio.toFixed(3)}s\n\n\n`;
 
 });
 

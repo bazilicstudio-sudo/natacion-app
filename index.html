@@ -337,8 +337,17 @@ return texto;
 async function generarPDF(texto,nombreArchivo){
 const { jsPDF } = window.jspdf;
 const doc = new jsPDF();
-let y=20;
 
+let pageWidth = doc.internal.pageSize.getWidth();
+let pageHeight = doc.internal.pageSize.getHeight();
+
+let y = 20;
+
+/* ===== FECHA Y HORA AUTOMÁTICA ===== */
+let ahora = new Date();
+let fechaHora = ahora.toLocaleString();
+
+/* ===== LOGO ===== */
 let logo=document.getElementById("logoInput").files[0];
 if(logo){
 let base=await fileToBase64(logo);
@@ -346,39 +355,66 @@ doc.addImage(base,"PNG",15,10,40,20);
 }
 
 doc.setFontSize(14);
-doc.text("REPORTE OFICIAL",105,25,null,null,"center");
+doc.text("REPORTE OFICIAL",pageWidth/2,25,null,null,"center");
+
+doc.setFontSize(9);
+doc.text("Generado: "+fechaHora,pageWidth-15,15,null,null,"right");
+
 y=40;
 
+/* ===== CONTENIDO ===== */
 let lines=doc.splitTextToSize(texto,180);
+
 lines.forEach(l=>{
-if(y>270){doc.addPage();y=20;}
+if(y>pageHeight-20){
+doc.addPage();
+y=20;
+}
 doc.text(l,15,y);
 y+=6;
 });
 
+/* ===== NUMERACIÓN DE PÁGINAS ===== */
+let totalPages = doc.getNumberOfPages();
+
+for (let i = 1; i <= totalPages; i++) {
+doc.setPage(i);
+doc.setFontSize(9);
+doc.text(
+`Página ${i} de ${totalPages}`,
+pageWidth/2,
+pageHeight-10,
+null,
+null,
+"center"
+);
+}
+
+/* ===== FIRMA Y ENTRENADOR SOLO EN ÚLTIMA PÁGINA ===== */
+doc.setPage(totalPages);
+
 let firma=document.getElementById("firmaInput").files[0];
 let coach=document.getElementById("coachName").value;
 
+let firmaY = pageHeight - 50;
+
+/* Línea para firma */
+doc.line(20, firmaY, 80, firmaY);
+
+doc.setFontSize(10);
+doc.text("Firma Entrenador",20,firmaY+5);
+
 if(firma){
-doc.addPage();
 let base=await fileToBase64(firma);
-doc.text("Firma Entrenador:",20,40);
-doc.addImage(base,"PNG",20,50,60,30);
-if(coach) doc.text(coach,20,90);
+doc.addImage(base,"PNG",20,firmaY-25,60,25);
+}
+
+if(coach){
+doc.text(coach,20,firmaY+12);
 }
 
 doc.save(nombreArchivo+".pdf");
 }
-
-function fileToBase64(file){
-return new Promise((res,rej)=>{
-let reader=new FileReader();
-reader.readAsDataURL(file);
-reader.onload=()=>res(reader.result);
-reader.onerror=error=>rej(error);
-});
-}
-
 /* ===== DESCARGAS ===== */
 
 function downloadFull(){
@@ -423,4 +459,3 @@ renderTests();
 </script>
 </body>
 </html>
-

@@ -1,114 +1,3 @@
-<!DOCTYPE html>
-<html lang="es">
-<head>
-<meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Sistema Competencia Elite PRO MAX</title>
-
-<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
-
-<style>
-body{margin:0;font-family:sans-serif;background:#0f172a;color:white;padding:10px;}
-.card{background:#1f2937;padding:15px;border-radius:15px;margin-bottom:15px;}
-button{padding:10px;margin:5px 0;border:none;border-radius:10px;font-weight:bold;cursor:pointer;width:100%;}
-.btn{background:#2563eb;color:white}
-.btn-success{background:#16a34a;color:white}
-.btn-danger{background:#dc2626;color:white}
-.btn-warning{background:#f59e0b;color:white}
-.btn-edit{background:#9333ea;color:white}
-.lane{background:#111827;padding:15px;margin:10px 0;border-radius:15px;text-align:center;}
-.timeDisplay{font-size:22px;font-weight:bold;margin:10px 0;}
-.hidden{display:none}
-input,select{width:100%;padding:8px;margin:5px 0;border-radius:8px;border:none;}
-.small-btn{padding:5px;font-size:12px;margin-top:5px;width:auto;margin-right:5px;}
-.tabs button{width:auto;margin-right:5px;}
-canvas{background:white;border-radius:10px;padding:10px;}
-</style>
-</head>
-<body>
-
-<h2>🏊 Sistema Competencia Elite PRO MAX</h2>
-
-<div id="loginCard" class="card">
-<h3>Iniciar Sesión</h3>
-<input type="text" id="loginUser" placeholder="Usuario">
-<input type="password" id="loginPass" placeholder="Contraseña">
-<button class="btn" onclick="login()">Ingresar</button>
-</div>
-
-<div id="app" class="hidden">
-
-<button class="btn-danger" onclick="logout()">Cerrar Sesión</button>
-
-<div class="tabs">
-<button class="btn" onclick="showTab('mainTab')">Competencia</button>
-<button class="btn-warning" onclick="showTab('statsTab')">Estadísticas</button>
-</div>
-
-<div id="mainTab">
-
-<div class="card">
-<h3>Atletas</h3>
-<input type="text" id="newAthleteUser" placeholder="Nombre atleta">
-<input type="password" id="newAthletePass" placeholder="Contraseña">
-<input type="number" id="newAthleteAge" placeholder="Edad">
-<select id="newAthleteSex">
-<option value="">Sexo</option>
-<option value="Masculino">Masculino</option>
-<option value="Femenino">Femenino</option>
-</select>
-<button class="btn-success" onclick="createAthlete()">Crear Atleta</button>
-<div id="athleteList"></div>
-</div>
-
-<div class="card">
-<h3>📋 Datos de la Prueba</h3>
-<input type="text" id="testName" placeholder="Nombre prueba">
-<input type="number" id="testDistance" placeholder="Metros">
-<input type="date" id="testDate">
-<button class="btn-success" onclick="activateTest()">Activar Prueba</button>
-<div id="activeTestInfo"></div>
-</div>
-
-<div class="card">
-<h3>Competencia</h3>
-<input type="number" id="laneCount" value="4" min="2" max="10">
-<button class="btn-success" onclick="startCompetition()">Crear Carriles</button>
-<button class="btn-success" onclick="startRaceNow()">🚦 INICIAR</button>
-<button class="btn-danger" onclick="resetRace()">🔄 Reiniciar</button>
-<div id="lanes"></div>
-</div>
-
-<div class="card">
-<h3>Ranking</h3>
-<div id="ranking"></div>
-</div>
-
-<div class="card">
-<h3>📥 Descargas Profesionales</h3>
-<button class="btn" onclick="downloadFull()">Descargar Historial Completo</button>
-<select id="downloadAthleteSelect"></select>
-<button class="btn-success" onclick="downloadByAthlete()">Descargar por Atleta</button>
-<input type="date" id="downloadDate">
-<button class="btn-warning" onclick="downloadByDate()">Descargar por Fecha</button>
-<select id="downloadTestSelect"></select>
-<button class="btn-danger" onclick="downloadByTest()">Descargar por Prueba</button>
-</div>
-
-</div>
-
-<!-- ================= TAB ESTADISTICAS ================= -->
-
-<div id="statsTab" class="hidden">
-<div class="card">
-<h3>📊 Progreso por Atleta</h3>
-<select id="statsAthleteSelect" onchange="renderChart()"></select>
-<canvas id="progressChart"></canvas>
-</div>
-</div>
-
-</div>
-
 <script>
 
 /* ================= BASE ================= */
@@ -207,6 +96,9 @@ function startCompetition(){
 lanes.innerHTML="";
 laneTimers={};
 results=[];
+clearInterval(interval);
+startTime=0;
+
 for(let i=1;i<=laneCount.value;i++){
 laneTimers[i]={finished:false,time:0,athlete:null};
 let options=athletes.map(a=>`<option>${a.user}</option>`).join("");
@@ -223,7 +115,11 @@ Carril ${i}
 }
 
 function startRaceNow(){
+if(Object.keys(laneTimers).length===0) return;
+
 startTime=Date.now();
+clearInterval(interval);
+
 interval=setInterval(()=>{
 let t=Date.now()-startTime;
 for(let i in laneTimers){
@@ -235,15 +131,57 @@ document.getElementById("time"+i).innerText=(t/1000).toFixed(3);
 },10);
 }
 
+function finishLane(i){
+
+// No permitir tocar si no inició
+if(!startTime) return;
+
+// Ya terminó ese carril
+if(!laneTimers[i] || laneTimers[i].finished) return;
+
+laneTimers[i].finished=true;
+
+let final=laneTimers[i].time/1000;
+let name=laneTimers[i].athlete||"Sin atleta";
+
+results.push({name,time:final});
+
+// Guardar en prueba activa
+if(currentTest){
+currentTest.results.push({athlete:name,time:final});
+localStorage.setItem("allTests",JSON.stringify(allTests));
+}
+
+renderRanking();
+
+// Si todos terminaron, parar cronómetro
+let allFinished=Object.values(laneTimers).every(l=>l.finished);
+if(allFinished){
+clearInterval(interval);
+}
+}
+
 function resetRace(){
 clearInterval(interval);
+startTime=0;
 results=[];
 ranking.innerHTML="";
+
 for(let i in laneTimers){
 laneTimers[i].finished=false;
 laneTimers[i].time=0;
 document.getElementById("time"+i).innerText="0.000";
 }
+}
+
+/* ================= RANKING ================= */
+
+function renderRanking(){
+ranking.innerHTML="";
+results.sort((a,b)=>a.time-b.time);
+results.forEach((r,i)=>{
+ranking.innerHTML+=`${i+1}° ${r.name} - ${r.time.toFixed(3)}s<br>`;
+});
 }
 
 /* ================= GRAFICO ================= */
@@ -291,5 +229,3 @@ renderTests();
 }
 
 </script>
-</body>
-</html>

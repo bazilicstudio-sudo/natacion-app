@@ -286,11 +286,49 @@ ranking.innerHTML+=`${i+1}° ${r.name} - ${r.time.toFixed(3)}s<br>`;
 /* ===== TEXTO REPORTE ===== */
 
 function generarTexto(test){
-if(!test) return "";
-let texto=`PRUEBA: ${test.name}\nFecha: ${test.date}\n\n`;
+
+if(!test || !test.results || test.results.length===0){
+return `PRUEBA: ${test?.name || "Sin nombre"}\nSin registros.\n\n`;
+}
+
+let texto=`PRUEBA: ${test.name}\n`;
+texto+=`Distancia: ${test.distance || "-"} m\n`;
+texto+=`Fecha: ${test.date}\n\n`;
+
+let agrupado={};
+
+/* AGRUPAR RESULTADOS POR ATLETA */
 test.results.forEach(r=>{
-texto+=`${r.athlete} - ${r.time.toFixed(3)}s\n`;
+if(!agrupado[r.athlete]){
+agrupado[r.athlete]=[];
+}
+agrupado[r.athlete].push(r.time);
 });
+
+/* CALCULAR ESTADÍSTICAS */
+for(let atleta in agrupado){
+
+let tiempos=agrupado[atleta];
+
+let intentos=tiempos.length;
+let mejor=Math.min(...tiempos);
+let peor=Math.max(...tiempos);
+let promedio=tiempos.reduce((a,b)=>a+b,0)/intentos;
+
+/* buscar info del atleta */
+let info=athletes.find(a=>a.user===atleta) || {};
+
+texto+=`ATLETA: ${atleta}\n`;
+texto+=`Edad: ${info.age || "-"}\n`;
+texto+=`Sexo: ${info.sex || "-"}\n`;
+texto+=`Intentos: ${intentos}\n`;
+texto+=`Tiempos: ${tiempos.map(t=>t.toFixed(3)).join(" - ")}\n`;
+texto+=`Mejor Tiempo: ${mejor.toFixed(3)} s\n`;
+texto+=`Peor Tiempo: ${peor.toFixed(3)} s\n`;
+texto+=`Promedio: ${promedio.toFixed(3)} s\n`;
+texto+="----------------------------------------\n\n";
+}
+
 return texto;
 }
 

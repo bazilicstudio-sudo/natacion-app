@@ -19,6 +19,15 @@ button{cursor:pointer}
 
 <h1>🏊 Plataforma Entrenador Natación</h1>
 
+<!-- ENTRENADOR -->
+<div class="box">
+<h3>Entrenador</h3>
+<input type="text" id="coachName" placeholder="Nombre del Entrenador">
+<button class="btn" onclick="saveCoach()">Guardar Entrenador</button>
+<p id="coachDisplay"></p>
+</div>
+
+<!-- ATLETAS -->
 <div class="box">
 <h3>Agregar Atleta</h3>
 <input type="text" id="athleteName" placeholder="Nombre">
@@ -32,6 +41,7 @@ button{cursor:pointer}
 <div id="athleteList"></div>
 </div>
 
+<!-- PRUEBAS -->
 <div class="box">
 <h3>Crear Prueba</h3>
 <input type="text" id="testName" placeholder="Nombre Prueba">
@@ -40,6 +50,7 @@ button{cursor:pointer}
 <button class="btn" onclick="createTest()">Crear</button>
 </div>
 
+<!-- REGISTRO -->
 <div class="box">
 <h3>Registrar Tiempo</h3>
 <select id="testSelect"></select>
@@ -48,42 +59,44 @@ button{cursor:pointer}
 <button class="btn" onclick="addResult()">Registrar</button>
 </div>
 
+<!-- DESCARGA -->
 <div class="box">
-<h3>📥 Descarga PDF</h3>
-
-<input type="file" id="logoInput" accept="image/*">
-<label>Logo</label><br>
-
-<input type="file" id="firmaInput" accept="image/*">
-<label>Firma</label><br>
-
-<input type="text" id="coachName" placeholder="Nombre Entrenador"><br>
+<h3>Descargar PDF</h3>
 
 <select id="filterAthlete">
 <option value="">Todos los atletas</option>
 </select>
 
-<input type="date" id="downloadDate"><br>
+<input type="date" id="downloadDate">
 
-<button class="btn-warning" onclick="downloadByFilter()">Descargar Filtrado</button>
-<button class="btn" onclick="downloadFull()">Descargar Completo</button>
+<button class="btn-warning" onclick="downloadByFilter()">Descargar Reporte</button>
 </div>
 
 <script>
 
 let athletes=[]
 let allTests=[]
+let coach=""
 
 function saveData(){
 localStorage.setItem("athletes",JSON.stringify(athletes))
 localStorage.setItem("tests",JSON.stringify(allTests))
+localStorage.setItem("coach",coach)
 }
 
 function loadData(){
 athletes=JSON.parse(localStorage.getItem("athletes"))||[]
 allTests=JSON.parse(localStorage.getItem("tests"))||[]
+coach=localStorage.getItem("coach")||""
+document.getElementById("coachDisplay").innerText=coach? "Entrenador: "+coach:""
 renderAthletes()
 renderTests()
+}
+
+function saveCoach(){
+coach=document.getElementById("coachName").value
+saveData()
+document.getElementById("coachDisplay").innerText="Entrenador: "+coach
 }
 
 function addAthlete(){
@@ -91,8 +104,8 @@ let name=document.getElementById("athleteName").value.trim()
 let age=document.getElementById("athleteAge").value
 let sex=document.getElementById("athleteSex").value
 
-if(!name){alert("Nombre requerido");return}
-if(athletes.some(a=>a.user===name)){alert("Ya existe");return}
+if(!name)return alert("Nombre requerido")
+if(athletes.some(a=>a.user===name))return alert("Ya existe")
 
 athletes.push({user:name,age,sex})
 saveData()
@@ -108,21 +121,12 @@ athletes.forEach((a,i)=>{
 document.getElementById("athleteList").innerHTML+=`
 <div>
 ${a.user}
-<button class="small-btn btn-warning" onclick="editAthlete(${i})">Editar</button>
 <button class="small-btn btn-danger" onclick="deleteAthlete(${i})">Eliminar</button>
 </div>`
 
 document.getElementById("athleteSelect").innerHTML+=`<option>${a.user}</option>`
 document.getElementById("filterAthlete").innerHTML+=`<option>${a.user}</option>`
 })
-}
-
-function editAthlete(i){
-let nuevo=prompt("Nuevo nombre",athletes[i].user)
-if(!nuevo)return
-athletes[i].user=nuevo
-saveData()
-renderAthletes()
 }
 
 function deleteAthlete(i){
@@ -138,7 +142,7 @@ let name=document.getElementById("testName").value
 let distance=document.getElementById("testDistance").value
 let date=document.getElementById("testDate").value
 
-if(!name||!date){alert("Faltan datos");return}
+if(!name||!date)return alert("Faltan datos")
 
 allTests.push({name,distance,date,results:[]})
 saveData()
@@ -157,19 +161,39 @@ let testIndex=document.getElementById("testSelect").value
 let athlete=document.getElementById("athleteSelect").value
 let time=parseFloat(document.getElementById("timeInput").value)
 
-if(!athlete||!time){alert("Datos inválidos");return}
+if(!athlete||!time)return alert("Datos inválidos")
 
 allTests[testIndex].results.push({athlete,time})
 saveData()
 alert("Tiempo registrado")
 }
 
-function generarTexto(test){
+function generarTextoFiltrado(atletaFiltro,fechaFiltro){
 
-let texto=`PRUEBA: ${test.name}\nFecha: ${test.date}\n\n`
+let texto="REPORTE DE RENDIMIENTO\n\n"
+texto+="Entrenador: "+(coach||"No definido")+"\n\n"
+
+let historialGlobal=[]
+
+allTests
+.sort((a,b)=>new Date(a.date)-new Date(b.date))
+.forEach(test=>{
+
+if(fechaFiltro && test.date!==fechaFiltro)return
+
+let resultados=test.results.filter(r=>{
+if(atletaFiltro)return r.athlete===atletaFiltro
+return true
+})
+
+if(resultados.length===0)return
+
+texto+=`PRUEBA: ${test.name}\n`
+texto+=`Distancia: ${test.distance} m\n`
+texto+=`Fecha: ${test.date}\n\n`
+
 let agrupado={}
-
-test.results.forEach(r=>{
+resultados.forEach(r=>{
 if(!agrupado[r.athlete])agrupado[r.athlete]=[]
 agrupado[r.athlete].push(r.time)
 })
@@ -181,103 +205,45 @@ let intentos=tiempos.length
 let mejor=Math.min(...tiempos)
 let promedio=tiempos.reduce((a,b)=>a+b,0)/intentos
 
-let historial=[]
-allTests.forEach(t=>{
-t.results.forEach(r=>{
-if(r.athlete===atleta)historial.push(r.time)
-})
-})
+historialGlobal.push(...tiempos)
 
-let mejora="No aplica"
-if(historial.length>=2){
-let primero=historial[0]
-let ultimo=historial[historial.length-1]
-let porcentaje=((primero-ultimo)/primero)*100
-mejora=porcentaje.toFixed(2)+" %"
+let info=athletes.find(a=>a.user===atleta)||{}
+
+texto+=`Atleta: ${atleta}\n`
+texto+=`Edad: ${info.age||"-"}\n`
+texto+=`Sexo: ${info.sex||"-"}\n`
+texto+=`Intentos: ${intentos}\n`
+texto+=`Tiempos: ${tiempos.map(t=>t.toFixed(3)).join(" - ")}\n`
+texto+=`Mejor Tiempo: ${mejor.toFixed(3)}\n`
+texto+=`Promedio: ${promedio.toFixed(3)}\n`
+texto+="-------------------------\n\n"
 }
 
-texto+=`
-ATLETA: ${atleta}
-Intentos: ${intentos}
-Tiempos: ${tiempos.map(t=>t.toFixed(3)).join(" - ")}
-Mejor: ${mejor.toFixed(3)}
-Promedio: ${promedio.toFixed(3)}
-Mejora Histórica: ${mejora}
---------------------------
-`
+})
+
+if(historialGlobal.length>=2){
+let primero=historialGlobal[0]
+let ultimo=historialGlobal[historialGlobal.length-1]
+let mejora=((primero-ultimo)/primero)*100
+texto+="MEJORA HISTÓRICA GLOBAL: "+mejora.toFixed(2)+" %\n"
 }
 
 return texto
-}
-
-async function generarPDF(texto,nombre){
-
-const {jsPDF}=window.jspdf
-let doc=new jsPDF()
-
-let y=10
-
-let logo=document.getElementById("logoInput").files[0]
-if(logo){
-let reader=new FileReader()
-reader.onload=function(e){
-doc.addImage(e.target.result,"PNG",10,10,30,30)
-}
-reader.readAsDataURL(logo)
-}
-
-doc.text(texto,10,50)
-
-let firma=document.getElementById("firmaInput").files[0]
-if(firma){
-let reader=new FileReader()
-reader.onload=function(e){
-doc.addImage(e.target.result,"PNG",140,250,40,20)
-doc.save(nombre+".pdf")
-}
-reader.readAsDataURL(firma)
-}else{
-doc.save(nombre+".pdf")
-}
 }
 
 function downloadByFilter(){
 
 let atleta=document.getElementById("filterAthlete").value
 let fecha=document.getElementById("downloadDate").value
-let texto=""
 
-allTests.forEach(test=>{
+let texto=generarTextoFiltrado(atleta,fecha)
 
-if(fecha && test.date!==fecha)return
+if(!texto)return alert("Sin datos")
 
-let resultados=test.results
-
-if(atleta){
-resultados=resultados.filter(r=>r.athlete===atleta)
-}
-
-if(resultados.length===0)return
-
-let copia={...test,results:resultados}
-texto+=generarTexto(copia)
-})
-
-if(!texto){alert("Sin datos");return}
-
-generarPDF(texto,"reporte_filtrado")
-}
-
-function downloadFull(){
-
-let texto=""
-allTests.forEach(t=>{
-texto+=generarTexto(t)
-})
-
-if(!texto){alert("Sin datos");return}
-
-generarPDF(texto,"reporte_completo")
+const {jsPDF}=window.jspdf
+let doc=new jsPDF()
+doc.text(texto,10,10)
+doc.save("reporte.pdf")
 }
 
 loadData()

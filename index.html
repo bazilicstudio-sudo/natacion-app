@@ -114,21 +114,89 @@ function logout(){location.reload();}
 /* ================= ATLETAS ================= */
 
 function createAthlete(){
+
+if(!newAthleteUser.value) return alert("Ingrese nombre");
+
+if(athletes.some(a=>a.user===newAthleteUser.value)){
+alert("Ya existe un atleta con ese nombre");
+return;
+}
+
 athletes.push({
 user:newAthleteUser.value,
 pass:newAthletePass.value,
 age:newAthleteAge.value||"",
 sex:newAthleteSex.value||""
 });
+
 localStorage.setItem("athletes",JSON.stringify(athletes));
 renderAthletes();
+}
+
+function editAthlete(index){
+let nuevoNombre=prompt("Nuevo nombre:",athletes[index].user);
+if(!nuevoNombre) return;
+
+if(athletes.some((a,i)=>a.user===nuevoNombre && i!==index)){
+alert("Ya existe otro atleta con ese nombre");
+return;
+}
+
+let nuevaEdad=prompt("Nueva edad:",athletes[index].age);
+let nuevoSexo=prompt("Nuevo sexo:",athletes[index].sex);
+
+let nombreAnterior=athletes[index].user;
+
+athletes[index].user=nuevoNombre;
+athletes[index].age=nuevaEdad;
+athletes[index].sex=nuevoSexo;
+
+/* actualizar registros históricos */
+allTests.forEach(t=>{
+t.results.forEach(r=>{
+if(r.athlete===nombreAnterior){
+r.athlete=nuevoNombre;
+}
+});
+});
+
+localStorage.setItem("athletes",JSON.stringify(athletes));
+localStorage.setItem("allTests",JSON.stringify(allTests));
+
+renderAll();
+}
+
+function deleteAthlete(index){
+
+if(!confirm("¿Seguro que deseas eliminar este atleta?")) return;
+
+let nombre=athletes[index].user;
+
+athletes.splice(index,1);
+
+allTests.forEach(t=>{
+t.results=t.results.filter(r=>r.athlete!==nombre);
+});
+
+localStorage.setItem("athletes",JSON.stringify(athletes));
+localStorage.setItem("allTests",JSON.stringify(allTests));
+
+renderAll();
 }
 
 function renderAthletes(){
 athleteList.innerHTML="";
 downloadAthleteSelect.innerHTML="";
-athletes.forEach(a=>{
-athleteList.innerHTML+=`${a.user} | Edad:${a.age||"-"} | Sexo:${a.sex||"-"}<br>`;
+
+athletes.forEach((a,index)=>{
+athleteList.innerHTML+=`
+<div style="margin-bottom:8px;padding:5px;background:#111827;border-radius:8px;">
+<b>${a.user}</b> | Edad:${a.age||"-"} | Sexo:${a.sex||"-"} <br>
+<button class="small-btn btn-warning" onclick="editAthlete(${index})">Editar</button>
+<button class="small-btn btn-danger" onclick="deleteAthlete(${index})">Eliminar</button>
+</div>
+`;
+
 downloadAthleteSelect.innerHTML+=`<option value="${a.user}">${a.user}</option>`;
 });
 }
@@ -136,14 +204,23 @@ downloadAthleteSelect.innerHTML+=`<option value="${a.user}">${a.user}</option>`;
 /* ================= PRUEBAS ================= */
 
 function activateTest(){
+
+if(!testName.value || !testDate.value){
+alert("Complete nombre y fecha");
+return;
+}
+
 currentTest={
 name:testName.value,
 distance:testDistance.value,
 date:testDate.value,
 results:[]
 };
+
 allTests.push(currentTest);
+
 localStorage.setItem("allTests",JSON.stringify(allTests));
+
 activeTestInfo.innerHTML=`Activa: ${currentTest.name}`;
 renderTests();
 }
@@ -163,9 +240,13 @@ function startCompetition(){
 lanes.innerHTML="";
 laneTimers={};
 results=[];
+
 for(let i=1;i<=laneCount.value;i++){
+
 laneTimers[i]={finished:false,time:0,athlete:null};
+
 let options=athletes.map(a=>`<option>${a.user}</option>`).join("");
+
 lanes.innerHTML+=`
 <div class="lane">
 Carril ${i}
@@ -179,10 +260,11 @@ Carril ${i}
 }
 
 function startRaceNow(){
-raceStarted=true;
 startTime=Date.now();
+
 interval=setInterval(()=>{
 let t=Date.now()-startTime;
+
 for(let i in laneTimers){
 if(!laneTimers[i].finished){
 laneTimers[i].time=t;
@@ -196,6 +278,7 @@ function resetRace(){
 clearInterval(interval);
 results=[];
 ranking.innerHTML="";
+
 for(let i in laneTimers){
 laneTimers[i].finished=false;
 laneTimers[i].time=0;
@@ -204,15 +287,25 @@ document.getElementById("time"+i).innerText="0.000";
 }
 
 function finishLane(i){
-if(laneTimers[i].finished)return;
+
+if(laneTimers[i].finished) return;
+
 laneTimers[i].finished=true;
+
 let final=laneTimers[i].time/1000;
 let name=laneTimers[i].athlete||"Sin atleta";
+
 results.push({name,time:final});
 
+/* guardar correctamente */
 if(currentTest){
-currentTest.results.push({athlete:name,time:final});
+
+let index=allTests.findIndex(t=>t.name===currentTest.name && t.date===currentTest.date);
+
+if(index!==-1){
+allTests[index].results.push({athlete:name,time:final});
 localStorage.setItem("allTests",JSON.stringify(allTests));
+}
 }
 
 renderRanking();
@@ -221,6 +314,7 @@ renderRanking();
 function renderRanking(){
 ranking.innerHTML="";
 results.sort((a,b)=>a.time-b.time);
+
 results.forEach((r,i)=>{
 ranking.innerHTML+=`${i+1}° ${r.name} - ${r.time.toFixed(3)}s<br>`;
 });
@@ -230,29 +324,43 @@ ranking.innerHTML+=`${i+1}° ${r.name} - ${r.time.toFixed(3)}s<br>`;
 
 function calcularEstadisticas(test){
 let agrupado={};
+
 test.results.forEach(r=>{
 if(!agrupado[r.athlete]) agrupado[r.athlete]=[];
 agrupado[r.athlete].push(r.time);
 });
+
 return agrupado;
 }
 
 function generarTexto(test){
-let texto=`PRUEBA: ${test.name}\nFecha: ${test.date}\n\n`;
+
+if(!test || !test.results || test.results.length===0){
+return `PRUEBA: ${test?.name||"Sin nombre"}\nSin registros.\n\n`;
+}
+
+let texto=`PRUEBA: ${test.name}\nDistancia: ${test.distance||"-"}m\nFecha: ${test.date}\n\n`;
+
 let datos=calcularEstadisticas(test);
 
 for(let atleta in datos){
+
 let info=athletes.find(a=>a.user===atleta)||{};
 let tiempos=datos[atleta];
+
 let promedio=tiempos.reduce((a,b)=>a+b)/tiempos.length;
 let mejor=Math.min(...tiempos);
 let peor=Math.max(...tiempos);
 
-texto+=`Atleta: ${atleta}\nEdad:${info.age||"-"} Sexo:${info.sex||"-"}\n`;
-texto+=`Intentos:${tiempos.length}\n`;
-texto+=`Tiempos:${tiempos.map(t=>t.toFixed(3)).join(" - ")}\n`;
-texto+=`Mejor:${mejor.toFixed(3)} Peor:${peor.toFixed(3)} Promedio:${promedio.toFixed(3)}\n`;
-texto+="----------------------\n";
+texto+=`Atleta: ${atleta}\n`;
+texto+=`Edad: ${info.age||"-"}\n`;
+texto+=`Sexo: ${info.sex||"-"}\n`;
+texto+=`Intentos: ${tiempos.length}\n`;
+texto+=`Tiempos: ${tiempos.map(t=>t.toFixed(3)).join(" - ")}\n`;
+texto+=`Mejor: ${mejor.toFixed(3)}\n`;
+texto+=`Peor: ${peor.toFixed(3)}\n`;
+texto+=`Promedio: ${promedio.toFixed(3)}\n`;
+texto+="----------------------------------\n";
 }
 
 return texto;
@@ -277,6 +385,7 @@ descargar(texto,"historial_completo.txt");
 function downloadByAthlete(){
 let atleta=downloadAthleteSelect.value;
 let texto="";
+
 allTests.forEach(t=>{
 let filtrado=t.results.filter(r=>r.athlete===atleta);
 if(filtrado.length>0){
@@ -284,17 +393,20 @@ let copia={...t,results:filtrado};
 texto+=generarTexto(copia)+"\n";
 }
 });
+
 descargar(texto,`historial_${atleta}.txt`);
 }
 
 function downloadByDate(){
 let fecha=downloadDate.value;
 let texto="";
+
 allTests.forEach(t=>{
 if(t.date===fecha){
 texto+=generarTexto(t)+"\n";
 }
 });
+
 descargar(texto,`historial_${fecha}.txt`);
 }
 
@@ -312,4 +424,3 @@ renderTests();
 </script>
 </body>
 </html>
-

@@ -15,13 +15,14 @@ button{padding:10px;margin:5px 0;border:none;border-radius:10px;font-weight:bold
 .btn-success{background:#16a34a;color:white}
 .btn-danger{background:#dc2626;color:white}
 .btn-warning{background:#f59e0b;color:white}
+.btn-edit{background:#9333ea;color:white}
 .lane{background:#111827;padding:15px;margin:10px 0;border-radius:15px;text-align:center;}
 .timeDisplay{font-size:22px;font-weight:bold;margin:10px 0;}
 .hidden{display:none}
 input,select{width:100%;padding:8px;margin:5px 0;border-radius:8px;border:none;}
-.small-btn{padding:5px;font-size:12px;width:auto;margin-right:5px;}
-table{width:100%;border-collapse:collapse;margin-top:10px;}
-th,td{border:1px solid #334155;padding:6px;text-align:center;}
+.small-btn{padding:5px;font-size:12px;margin-top:5px;width:auto;margin-right:5px;}
+.tabs button{width:auto;margin-right:5px;}
+canvas{background:white;border-radius:10px;padding:10px;}
 </style>
 </head>
 <body>
@@ -31,14 +32,25 @@ th,td{border:1px solid #334155;padding:6px;text-align:center;}
 <div id="loginCard" class="card">
 <h3>Iniciar Sesión</h3>
 <input type="text" id="loginUser" placeholder="Usuario">
+<input type="password" id="loginPass" placeholder="Contraseña">
 <button class="btn" onclick="login()">Ingresar</button>
 </div>
 
 <div id="app" class="hidden">
 
+<button class="btn-danger" onclick="logout()">Cerrar Sesión</button>
+
+<div class="tabs">
+<button class="btn" onclick="showTab('mainTab')">Competencia</button>
+<button class="btn-warning" onclick="showTab('statsTab')">Estadísticas</button>
+</div>
+
+<div id="mainTab">
+
 <div class="card">
 <h3>Atletas</h3>
 <input type="text" id="newAthleteUser" placeholder="Nombre atleta">
+<input type="password" id="newAthletePass" placeholder="Contraseña">
 <input type="number" id="newAthleteAge" placeholder="Edad">
 <select id="newAthleteSex">
 <option value="">Sexo</option>
@@ -73,14 +85,26 @@ th,td{border:1px solid #334155;padding:6px;text-align:center;}
 </div>
 
 <div class="card">
-<h3>📊 Estadísticas Visuales</h3>
-<div id="statsTable"></div>
+<h3>📥 Descargas Profesionales</h3>
+<button class="btn" onclick="downloadFull()">Descargar Historial Completo</button>
+<select id="downloadAthleteSelect"></select>
+<button class="btn-success" onclick="downloadByAthlete()">Descargar por Atleta</button>
+<input type="date" id="downloadDate">
+<button class="btn-warning" onclick="downloadByDate()">Descargar por Fecha</button>
+<select id="downloadTestSelect"></select>
+<button class="btn-danger" onclick="downloadByTest()">Descargar por Prueba</button>
 </div>
 
+</div>
+
+<!-- ================= TAB ESTADISTICAS ================= -->
+
+<div id="statsTab" class="hidden">
 <div class="card">
-<h3>📈 Progreso del Atleta</h3>
-<select id="graphAthleteSelect" onchange="renderGraph()"></select>
+<h3>📊 Progreso por Atleta</h3>
+<select id="statsAthleteSelect" onchange="renderChart()"></select>
 <canvas id="progressChart"></canvas>
+</div>
 </div>
 
 </div>
@@ -97,7 +121,7 @@ catch{return [];}
 let athletes=safeParse("athletes");
 let allTests=safeParse("allTests");
 let currentTest=null;
-let chart=null;
+let chartInstance=null;
 
 function login(){
 loginCard.classList.add("hidden");
@@ -105,46 +129,58 @@ app.classList.remove("hidden");
 renderAll();
 }
 
+function logout(){location.reload();}
+
+function showTab(tab){
+mainTab.classList.add("hidden");
+statsTab.classList.add("hidden");
+document.getElementById(tab).classList.remove("hidden");
+}
+
 /* ================= ATLETAS ================= */
 
 function createAthlete(){
-if(!newAthleteUser.value)return;
 athletes.push({
 user:newAthleteUser.value,
-age:newAthleteAge.value||"",
-sex:newAthleteSex.value||""
+pass:newAthletePass.value,
+age:newAthleteAge.value,
+sex:newAthleteSex.value
 });
 localStorage.setItem("athletes",JSON.stringify(athletes));
 renderAthletes();
 }
 
-function editAthlete(index){
-let a=athletes[index];
-let nombre=prompt("Editar nombre:",a.user);
-if(!nombre)return;
-let edad=prompt("Editar edad:",a.age);
-let sexo=prompt("Editar sexo:",a.sex);
-athletes[index]={user:nombre,age:edad||"",sex:sexo||""};
-localStorage.setItem("athletes",JSON.stringify(athletes));
-renderAthletes();
-}
-
 function deleteAthlete(index){
-if(!confirm("Eliminar atleta?"))return;
+if(confirm("¿Eliminar atleta?")){
 athletes.splice(index,1);
 localStorage.setItem("athletes",JSON.stringify(athletes));
 renderAthletes();
 }
+}
+
+function editAthlete(index){
+let a=athletes[index];
+let nuevo=prompt("Nuevo nombre:",a.user);
+if(nuevo){
+athletes[index].user=nuevo;
+localStorage.setItem("athletes",JSON.stringify(athletes));
+renderAthletes();
+}
+}
 
 function renderAthletes(){
 athleteList.innerHTML="";
-graphAthleteSelect.innerHTML="";
+downloadAthleteSelect.innerHTML="";
+statsAthleteSelect.innerHTML="";
+
 athletes.forEach((a,i)=>{
 athleteList.innerHTML+=`
 ${a.user} | Edad:${a.age||"-"} | Sexo:${a.sex||"-"}
-<button class="small-btn btn-warning" onclick="editAthlete(${i})">Editar</button>
-<button class="small-btn btn-danger" onclick="deleteAthlete(${i})">Eliminar</button><br>`;
-graphAthleteSelect.innerHTML+=`<option>${a.user}</option>`;
+<button class="small-btn btn-edit" onclick="editAthlete(${i})">Editar</button>
+<button class="small-btn btn-danger" onclick="deleteAthlete(${i})">Eliminar</button>
+<hr>`;
+downloadAthleteSelect.innerHTML+=`<option value="${a.user}">${a.user}</option>`;
+statsAthleteSelect.innerHTML+=`<option value="${a.user}">${a.user}</option>`;
 });
 }
 
@@ -160,11 +196,12 @@ results:[]
 allTests.push(currentTest);
 localStorage.setItem("allTests",JSON.stringify(allTests));
 activeTestInfo.innerHTML=`Activa: ${currentTest.name}`;
+renderTests();
 }
 
 /* ================= CRONOMETRO ================= */
 
-let laneTimers={},results=[],interval,startTime;
+let laneTimers={},results=[],startTime=0,interval;
 
 function startCompetition(){
 lanes.innerHTML="";
@@ -209,89 +246,48 @@ document.getElementById("time"+i).innerText="0.000";
 }
 }
 
-function finishLane(i){
-if(laneTimers[i].finished)return;
-laneTimers[i].finished=true;
-let final=laneTimers[i].time/1000;
-let name=laneTimers[i].athlete||"Sin atleta";
-results.push({name,time:final});
-
-if(currentTest){
-currentTest.results.push({athlete:name,time:final});
-localStorage.setItem("allTests",JSON.stringify(allTests));
-}
-
-renderRanking();
-renderStats();
-renderGraph();
-}
-
-function renderRanking(){
-ranking.innerHTML="";
-results.sort((a,b)=>a.time-b.time);
-results.forEach((r,i)=>{
-ranking.innerHTML+=`${i+1}° ${r.name} - ${r.time.toFixed(3)}s<br>`;
-});
-}
-
-/* ================= TABLA ESTADISTICAS ================= */
-
-function renderStats(){
-if(!currentTest)return;
-let agrupado={};
-currentTest.results.forEach(r=>{
-if(!agrupado[r.athlete])agrupado[r.athlete]=[];
-agrupado[r.athlete].push(r.time);
-});
-
-let html="<table><tr><th>Atleta</th><th>Intentos</th><th>Mejor</th><th>Peor</th><th>Promedio</th></tr>";
-
-for(let atleta in agrupado){
-let tiempos=agrupado[atleta];
-let promedio=tiempos.reduce((a,b)=>a+b)/tiempos.length;
-html+=`<tr>
-<td>${atleta}</td>
-<td>${tiempos.length}</td>
-<td>${Math.min(...tiempos).toFixed(3)}</td>
-<td>${Math.max(...tiempos).toFixed(3)}</td>
-<td>${promedio.toFixed(3)}</td>
-</tr>`;
-}
-
-html+="</table>";
-statsTable.innerHTML=html;
-}
-
 /* ================= GRAFICO ================= */
 
-function renderGraph(){
-let atleta=graphAthleteSelect.value;
+function renderChart(){
+let athlete=statsAthleteSelect.value;
 let tiempos=[];
+let etiquetas=[];
 
 allTests.forEach(t=>{
 t.results.forEach(r=>{
-if(r.athlete===atleta)tiempos.push(r.time);
+if(r.athlete===athlete){
+tiempos.push(r.time);
+etiquetas.push(t.name+" "+t.date);
+}
 });
 });
 
-if(chart)chart.destroy();
+if(chartInstance) chartInstance.destroy();
 
-chart=new Chart(document.getElementById("progressChart"),{
-type:"line",
+chartInstance=new Chart(progressChart,{
+type:'line',
 data:{
-labels:tiempos.map((_,i)=>"Intento "+(i+1)),
+labels:etiquetas,
 datasets:[{
-label:"Progreso de tiempos",
+label:'Progreso',
 data:tiempos,
-borderColor:"lime",
-backgroundColor:"rgba(0,255,0,0.2)"
+borderColor:'blue',
+backgroundColor:'lightblue'
 }]
 }
 });
 }
 
+function renderTests(){
+downloadTestSelect.innerHTML="";
+allTests.forEach((t,i)=>{
+downloadTestSelect.innerHTML+=`<option value="${i}">${t.name} - ${t.date}</option>`;
+});
+}
+
 function renderAll(){
 renderAthletes();
+renderTests();
 }
 
 </script>

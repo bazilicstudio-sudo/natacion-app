@@ -38,20 +38,64 @@ input,select{width:100%;padding:8px;margin:5px 0;border-radius:8px;border:none;}
 <button class="btn-danger" onclick="logout()">Cerrar Sesión</button>
 
 <div class="card">
-<h3>Entrenadores</h3>
-<input type="text" id="newCoachName" placeholder="Nombre del Entrenador">
-<input type="file" id="newCoachFirma" accept="image/*">
-<button class="btn-success" onclick="createCoach()">Crear Entrenador</button>
-<select id="coachSelect"></select>
+<h3>Atletas</h3>
+<input type="text" id="newAthleteUser" placeholder="Nombre atleta">
+<input type="password" id="newAthletePass" placeholder="Contraseña">
+<input type="number" id="newAthleteAge" placeholder="Edad">
+<select id="newAthleteSex">
+<option value="">Sexo</option>
+<option value="Masculino">Masculino</option>
+<option value="Femenino">Femenino</option>
+</select>
+<button class="btn-success" onclick="createAthlete()">Crear Atleta</button>
+<div id="athleteList"></div>
+</div>
+
+<div class="card">
+<h3>📋 Datos de la Prueba</h3>
+<input type="text" id="testName" placeholder="Nombre prueba">
+<input type="number" id="testDistance" placeholder="Metros">
+<input type="date" id="testDate">
+<button class="btn-success" onclick="activateTest()">Activar Prueba</button>
+<div id="activeTestInfo"></div>
+</div>
+
+<div class="card">
+<h3>Competencia</h3>
+<input type="number" id="laneCount" value="4" min="2" max="10">
+<button class="btn-success" onclick="startCompetition()">Crear Carriles</button>
+<button class="btn-success" onclick="startRaceNow()">🚦 INICIAR</button>
+<button class="btn-danger" onclick="resetRace()">🔄 Reiniciar</button>
+<div id="lanes"></div>
+</div>
+
+<div class="card">
+<h3>Ranking</h3>
+<div id="ranking"></div>
 </div>
 
 <div class="card">
 <h3>📥 Descargas Profesionales (PDF)</h3>
+
 <input type="file" id="logoInput" accept="image/*">
 <label>Logo Institucional</label>
+
+<input type="file" id="firmaInput" accept="image/*">
+<label>Firma del Entrenador</label>
+
+<input type="text" id="coachName" placeholder="Nombre del Entrenador">
+
 <button class="btn" onclick="downloadFull()">Descargar Historial Completo</button>
+
+<select id="downloadAthleteSelect"></select>
+<button class="btn-success" onclick="downloadByAthlete()">Descargar por Atleta</button>
+
+<input type="date" id="downloadDate">
+<button class="btn-warning" onclick="downloadByDate()">Descargar por Fecha</button>
+
 <select id="downloadTestSelect"></select>
 <button class="btn-danger" onclick="downloadByTest()">Descargar por Prueba</button>
+
 </div>
 
 </div>
@@ -59,101 +103,242 @@ input,select{width:100%;padding:8px;margin:5px 0;border-radius:8px;border:none;}
 <script>
 
 /* ===== BASE ===== */
+
 function safeParse(key){
 try{return JSON.parse(localStorage.getItem(key))||[];}
 catch{return [];}
 }
 
+let athletes=safeParse("athletes");
 let allTests=safeParse("allTests");
-let coaches=safeParse("coaches");
+let currentTest=null;
 
 /* ===== LOGIN ===== */
+
 function login(){
 document.getElementById("loginCard").classList.add("hidden");
 document.getElementById("app").classList.remove("hidden");
 renderAll();
 }
+
 function logout(){location.reload();}
 
-/* ===== ENTRENADORES ===== */
-function createCoach(){
-let nombre=document.getElementById("newCoachName").value;
-let firmaFile=document.getElementById("newCoachFirma").files[0];
+/* ===== ATLETAS ===== */
 
-if(!nombre) return alert("Ingrese nombre del entrenador");
+function createAthlete(){
+let nombre=document.getElementById("newAthleteUser").value;
+if(!nombre) return alert("Ingrese nombre");
 
-if(coaches.some(c=>c.name===nombre)){
-alert("Ya existe ese entrenador");
+if(athletes.some(a=>a.user===nombre)){
+alert("Ya existe un atleta con ese nombre");
 return;
 }
 
-if(firmaFile){
-let reader=new FileReader();
-reader.onload=function(){
-coaches.push({name:nombre,firma:reader.result});
-localStorage.setItem("coaches",JSON.stringify(coaches));
-renderCoaches();
-}
-reader.readAsDataURL(firmaFile);
-}else{
-coaches.push({name:nombre,firma:null});
-localStorage.setItem("coaches",JSON.stringify(coaches));
-renderCoaches();
-}
+athletes.push({
+user:nombre,
+pass:newAthletePass.value,
+age:newAthleteAge.value||"",
+sex:newAthleteSex.value||""
+});
+
+localStorage.setItem("athletes",JSON.stringify(athletes));
+renderAthletes();
 }
 
-function renderCoaches(){
-coachSelect.innerHTML="";
-coaches.forEach((c,i)=>{
-coachSelect.innerHTML+=`<option value="${i}">${c.name}</option>`;
-});
+function editAthlete(index){
+let nuevoNombre=prompt("Nuevo nombre:",athletes[index].user);
+if(!nuevoNombre) return;
+
+if(athletes.some((a,i)=>a.user===nuevoNombre && i!==index)){
+alert("Ya existe otro atleta con ese nombre");
+return;
 }
 
-/* ===== PRUEBAS DEMO SI NO HAY ===== */
-if(allTests.length===0){
-allTests.push({
-name:"100m Libre",
-distance:100,
-date:"2026-02-25",
-results:[
-{athlete:"Juan",time:55.321},
-{athlete:"Pedro",time:57.112}
-]
+athletes[index].user=nuevoNombre;
+localStorage.setItem("athletes",JSON.stringify(athletes));
+renderAll();
+}
+
+function deleteAthlete(index){
+if(!confirm("¿Eliminar atleta?")) return;
+let nombre=athletes[index].user;
+athletes.splice(index,1);
+
+allTests.forEach(t=>{
+t.results=t.results.filter(r=>r.athlete!==nombre);
 });
+
+localStorage.setItem("athletes",JSON.stringify(athletes));
 localStorage.setItem("allTests",JSON.stringify(allTests));
+renderAll();
+}
+
+function renderAthletes(){
+athleteList.innerHTML="";
+downloadAthleteSelect.innerHTML="";
+athletes.forEach((a,index)=>{
+athleteList.innerHTML+=`
+<div style="background:#111827;padding:5px;margin-bottom:5px;border-radius:8px;">
+<b>${a.user}</b>
+<button class="small-btn btn-warning" onclick="editAthlete(${index})">Editar</button>
+<button class="small-btn btn-danger" onclick="deleteAthlete(${index})">Eliminar</button>
+</div>`;
+downloadAthleteSelect.innerHTML+=`<option value="${a.user}">${a.user}</option>`;
+});
+}
+
+/* ===== PRUEBAS ===== */
+
+function activateTest(){
+if(!testName.value || !testDate.value){
+alert("Complete nombre y fecha");
+return;
+}
+currentTest={
+name:testName.value,
+distance:testDistance.value,
+date:testDate.value,
+results:[]
+};
+allTests.push(currentTest);
+localStorage.setItem("allTests",JSON.stringify(allTests));
+activeTestInfo.innerHTML="Activa: "+currentTest.name;
+renderTests();
+}
+
+function renderTests(){
+downloadTestSelect.innerHTML="";
+allTests.forEach((t,i)=>{
+downloadTestSelect.innerHTML+=`<option value="${i}">${t.name} - ${t.date}</option>`;
+});
+}
+
+/* ===== CRONO ===== */
+
+let laneTimers={},results=[],interval;
+
+function startCompetition(){
+lanes.innerHTML="";
+laneTimers={};
+results=[];
+for(let i=1;i<=laneCount.value;i++){
+laneTimers[i]={finished:false,time:0,athlete:null};
+let options=athletes.map(a=>`<option>${a.user}</option>`).join("");
+lanes.innerHTML+=`
+<div class="lane">
+Carril ${i}
+<select onchange="laneTimers[${i}].athlete=this.value">
+<option></option>${options}
+</select>
+<div class="timeDisplay" id="time${i}">0.000</div>
+<button onclick="finishLane(${i})">TOCAR</button>
+</div>`;
+}
+}
+
+function startRaceNow(){
+let startTime=Date.now();
+clearInterval(interval);
+interval=setInterval(()=>{
+let t=Date.now()-startTime;
+for(let i in laneTimers){
+if(!laneTimers[i].finished){
+laneTimers[i].time=t;
+document.getElementById("time"+i).innerText=(t/1000).toFixed(3);
+}
+}
+},10);
+}
+
+function resetRace(){
+clearInterval(interval);
+results=[];
+ranking.innerHTML="";
+for(let i in laneTimers){
+laneTimers[i].finished=false;
+laneTimers[i].time=0;
+let el=document.getElementById("time"+i);
+if(el) el.innerText="0.000";
+}
+}
+
+function finishLane(i){
+if(laneTimers[i].finished) return;
+laneTimers[i].finished=true;
+let final=laneTimers[i].time/1000;
+let name=laneTimers[i].athlete||"Sin atleta";
+results.push({name,time:final});
+if(currentTest){
+currentTest.results.push({athlete:name,time:final});
+localStorage.setItem("allTests",JSON.stringify(allTests));
+}
+renderRanking();
+}
+
+function renderRanking(){
+ranking.innerHTML="";
+results.sort((a,b)=>a.time-b.time);
+results.forEach((r,i)=>{
+ranking.innerHTML+=`${i+1}° ${r.name} - ${r.time.toFixed(3)}s<br>`;
+});
 }
 
 /* ===== TEXTO REPORTE ===== */
+
 function generarTexto(test){
 
+if(!test || !test.results || test.results.length===0){
+return `PRUEBA: ${test?.name || "Sin nombre"}\nSin registros.\n\n`;
+}
+
 let texto=`PRUEBA: ${test.name}\n`;
-texto+=`Distancia: ${test.distance} m\n`;
+texto+=`Distancia: ${test.distance || "-"} m\n`;
 texto+=`Fecha: ${test.date}\n\n`;
 
+let agrupado={};
+
+/* AGRUPAR RESULTADOS POR ATLETA */
 test.results.forEach(r=>{
-texto+=`${r.athlete} - ${r.time.toFixed(3)} s\n`;
+if(!agrupado[r.athlete]){
+agrupado[r.athlete]=[];
+}
+agrupado[r.athlete].push(r.time);
 });
 
-texto+="\n----------------------------------------\n\n";
+/* CALCULAR ESTADÍSTICAS */
+for(let atleta in agrupado){
+
+let tiempos=agrupado[atleta];
+
+let intentos=tiempos.length;
+let mejor=Math.min(...tiempos);
+let peor=Math.max(...tiempos);
+let promedio=tiempos.reduce((a,b)=>a+b,0)/intentos;
+
+/* buscar info del atleta */
+let info=athletes.find(a=>a.user===atleta) || {};
+
+texto+=`ATLETA: ${atleta}\n`;
+texto+=`Edad: ${info.age || "-"}\n`;
+texto+=`Sexo: ${info.sex || "-"}\n`;
+texto+=`Intentos: ${intentos}\n`;
+texto+=`Tiempos: ${tiempos.map(t=>t.toFixed(3)).join(" - ")}\n`;
+texto+=`Mejor Tiempo: ${mejor.toFixed(3)} s\n`;
+texto+=`Peor Tiempo: ${peor.toFixed(3)} s\n`;
+texto+=`Promedio: ${promedio.toFixed(3)} s\n`;
+texto+="----------------------------------------\n\n";
+}
+
 return texto;
 }
 
-/* ===== PDF PROFESIONAL ===== */
-async function generarPDF(texto,nombreArchivo){
+/* ===== PDF ===== */
 
+async function generarPDF(texto,nombreArchivo){
 const { jsPDF } = window.jspdf;
 const doc = new jsPDF();
-
-let pageWidth = doc.internal.pageSize.getWidth();
-let pageHeight = doc.internal.pageSize.getHeight();
 let y=20;
 
-/* FECHA Y HORA */
-let now=new Date();
-let fecha=now.toLocaleDateString();
-let hora=now.toLocaleTimeString();
-
-/* LOGO */
 let logo=document.getElementById("logoInput").files[0];
 if(logo){
 let base=await fileToBase64(logo);
@@ -161,49 +346,25 @@ doc.addImage(base,"PNG",15,10,40,20);
 }
 
 doc.setFontSize(14);
-doc.text("REPORTE OFICIAL",pageWidth/2,25,null,null,"center");
-
-doc.setFontSize(9);
-doc.text(`Generado el: ${fecha} ${hora}`,pageWidth-15,15,null,null,"right");
-
+doc.text("REPORTE OFICIAL",105,25,null,null,"center");
 y=40;
 
-/* CONTENIDO */
 let lines=doc.splitTextToSize(texto,180);
-
 lines.forEach(l=>{
-if(y>pageHeight-20){
-doc.addPage();
-y=20;
-}
+if(y>270){doc.addPage();y=20;}
 doc.text(l,15,y);
 y+=6;
 });
 
-/* ENTRENADOR SOLO ÚLTIMA PÁGINA */
-let totalPages=doc.getNumberOfPages();
-doc.setPage(totalPages);
+let firma=document.getElementById("firmaInput").files[0];
+let coach=document.getElementById("coachName").value;
 
-let coachIndex=document.getElementById("coachSelect").value;
-let coach=coaches[coachIndex];
-
-let finalY=pageHeight-40;
-
-doc.setFontSize(10);
-doc.line(20,finalY,100,finalY);
-
-if(coach){
-doc.text(`Entrenador: ${coach.name}`,20,finalY+8);
-if(coach.firma){
-doc.addImage(coach.firma,"PNG",20,finalY-25,60,20);
-}
-}
-
-/* NUMERACIÓN */
-for(let i=1;i<=totalPages;i++){
-doc.setPage(i);
-doc.setFontSize(9);
-doc.text(`Página ${i} de ${totalPages}`,pageWidth-15,pageHeight-10,null,null,"right");
+if(firma){
+doc.addPage();
+let base=await fileToBase64(firma);
+doc.text("Firma Entrenador:",20,40);
+doc.addImage(base,"PNG",20,50,60,30);
+if(coach) doc.text(coach,20,90);
 }
 
 doc.save(nombreArchivo+".pdf");
@@ -219,10 +380,32 @@ reader.onerror=error=>rej(error);
 }
 
 /* ===== DESCARGAS ===== */
+
 function downloadFull(){
 let texto="";
 allTests.forEach(t=>texto+=generarTexto(t)+"\n");
 generarPDF(texto,"historial_completo");
+}
+
+function downloadByAthlete(){
+let atleta=downloadAthleteSelect.value;
+let texto="";
+allTests.forEach(t=>{
+let filtrado=t.results.filter(r=>r.athlete===atleta);
+filtrado.forEach(f=>{
+texto+=`${atleta} - ${f.time.toFixed(3)}s\n`;
+});
+});
+generarPDF(texto,"historial_"+atleta);
+}
+
+function downloadByDate(){
+let fecha=downloadDate.value;
+let texto="";
+allTests.forEach(t=>{
+if(t.date===fecha) texto+=generarTexto(t);
+});
+generarPDF(texto,"historial_"+fecha);
 }
 
 function downloadByTest(){
@@ -232,15 +415,8 @@ if(!test) return alert("Seleccione prueba");
 generarPDF(generarTexto(test),"historial_"+test.name);
 }
 
-function renderTests(){
-downloadTestSelect.innerHTML="";
-allTests.forEach((t,i)=>{
-downloadTestSelect.innerHTML+=`<option value="${i}">${t.name} - ${t.date}</option>`;
-});
-}
-
 function renderAll(){
-renderCoaches();
+renderAthletes();
 renderTests();
 }
 

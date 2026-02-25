@@ -39,19 +39,17 @@ input,select{width:100%;padding:8px;margin:5px 0;border-radius:8px;border:none;}
 <div id="sessionInfo"></div>
 <button class="btn-danger" onclick="logout()">Cerrar Sesión</button>
 
-<!-- ENTRENADORES (Solo Admin) -->
 <div id="coachCard" class="card hidden">
 <h3>Entrenadores</h3>
 
 <input type="text" id="newCoachName" placeholder="Usuario entrenador">
 <input type="password" id="newCoachPass" placeholder="Contraseña">
 <input type="text" id="newCoachSpecialty" placeholder="Especialidad">
-
 <button class="btn-success" onclick="createCoach()">Crear Entrenador</button>
+
 <div id="coachList"></div>
 </div>
 
-<!-- PRUEBAS -->
 <div class="card">
 <h3>📋 Datos de la Prueba</h3>
 <input type="text" id="testName" placeholder="Nombre prueba">
@@ -61,7 +59,6 @@ input,select{width:100%;padding:8px;margin:5px 0;border-radius:8px;border:none;}
 <div id="activeTestInfo"></div>
 </div>
 
-<!-- COMPETENCIA -->
 <div class="card">
 <h3>Competencia</h3>
 <input type="number" id="laneCount" value="4" min="2" max="10">
@@ -71,13 +68,11 @@ input,select{width:100%;padding:8px;margin:5px 0;border-radius:8px;border:none;}
 <div id="lanes"></div>
 </div>
 
-<!-- RANKING -->
 <div class="card">
 <h3>Ranking</h3>
 <div id="ranking"></div>
 </div>
 
-<!-- PDF -->
 <div class="card">
 <h3>📥 Descargar PDF</h3>
 <button class="btn" onclick="downloadCurrentTest()">Descargar Prueba Actual</button>
@@ -87,83 +82,83 @@ input,select{width:100%;padding:8px;margin:5px 0;border-radius:8px;border:none;}
 
 <script>
 
-/* ===== BASE ===== */
-
+/* ===== UTIL ===== */
 function safeParse(key){
 try{return JSON.parse(localStorage.getItem(key))||[];}
 catch{return [];}
 }
 
-let coaches=safeParse("coaches");
-let allTests=safeParse("allTests");
-let currentTest=null;
-let loggedUser=null;
+/* ===== VARIABLES ===== */
+let coaches = safeParse("coaches");
+let allTests = safeParse("allTests");
+let currentTest = null;
+let loggedUser = null;
 
-/* ===== ADMIN POR DEFECTO ===== */
-
-if(!localStorage.getItem("adminCreated")){
-coaches.push({user:"admin",pass:"admin123",role:"admin",specialty:"Administrador"});
+/* ===== CREAR ADMIN SI NO EXISTE ===== */
+if(!coaches.some(c => c.role === "admin")){
+coaches.push({
+user:"admin",
+pass:"admin123",
+role:"admin",
+specialty:"Administrador"
+});
 localStorage.setItem("coaches",JSON.stringify(coaches));
-localStorage.setItem("adminCreated","yes");
 }
 
 /* ===== LOGIN ===== */
-
 function login(){
-let user=loginUser.value;
-let pass=loginPass.value;
+let user=document.getElementById("loginUser").value;
+let pass=document.getElementById("loginPass").value;
 
 let found=coaches.find(c=>c.user===user && c.pass===pass);
 
-if(!found) return alert("Credenciales incorrectas");
+if(!found){
+alert("Credenciales incorrectas");
+return;
+}
 
 loggedUser=found;
 
-loginCard.classList.add("hidden");
-app.classList.remove("hidden");
+document.getElementById("loginCard").classList.add("hidden");
+document.getElementById("app").classList.remove("hidden");
 
-sessionInfo.innerHTML=`
-<div class="roleTag">
-Usuario: ${loggedUser.user} | Rol: ${loggedUser.role || "coach"}
-</div>`;
+document.getElementById("sessionInfo").innerHTML=
+`<div class="roleTag">Usuario: ${found.user} | Rol: ${found.role}</div>`;
 
-if(loggedUser.role==="admin"){
-coachCard.classList.remove("hidden");
-}else{
-coachCard.classList.add("hidden");
-}
-
+if(found.role==="admin"){
+document.getElementById("coachCard").classList.remove("hidden");
 renderCoaches();
-renderTests();
+}
 }
 
 /* ===== LOGOUT ===== */
-
 function logout(){
 location.reload();
 }
 
 /* ===== ENTRENADORES ===== */
-
 function createCoach(){
 if(loggedUser.role!=="admin") return;
 
-let nombre=newCoachName.value;
-let pass=newCoachPass.value;
-let esp=newCoachSpecialty.value;
+let name=document.getElementById("newCoachName").value;
+let pass=document.getElementById("newCoachPass").value;
+let spec=document.getElementById("newCoachSpecialty").value;
 
-if(!nombre || !pass) return alert("Complete usuario y contraseña");
+if(!name || !pass){
+alert("Complete usuario y contraseña");
+return;
+}
 
-if(coaches.some(c=>c.user===nombre)){
-alert("Ya existe");
+if(coaches.some(c=>c.user===name)){
+alert("Ya existe entrenador");
 return;
 }
 
 coaches.push({
-user:nombre,
+user:name,
 pass:pass,
 role:"coach",
-specialty:esp||""
+specialty:spec||""
 });
 
 localStorage.setItem("coaches",JSON.stringify(coaches));
@@ -174,31 +169,33 @@ newCoachPass.value="";
 newCoachSpecialty.value="";
 }
 
-function editCoach(i){
+function editCoach(index){
 if(loggedUser.role!=="admin") return;
 
-let nuevo=prompt("Nuevo usuario:",coaches[i].user);
+let nuevo=prompt("Nuevo usuario:",coaches[index].user);
 if(!nuevo) return;
 
-coaches[i].user=nuevo;
+coaches[index].user=nuevo;
 localStorage.setItem("coaches",JSON.stringify(coaches));
 renderCoaches();
 }
 
-function deleteCoach(i){
+function deleteCoach(index){
 if(loggedUser.role!=="admin") return;
-if(!confirm("¿Eliminar?")) return;
+if(!confirm("¿Eliminar entrenador?")) return;
 
-coaches.splice(i,1);
+coaches.splice(index,1);
 localStorage.setItem("coaches",JSON.stringify(coaches));
 renderCoaches();
 }
 
 function renderCoaches(){
-coachList.innerHTML="";
+let container=document.getElementById("coachList");
+container.innerHTML="";
+
 coaches.forEach((c,i)=>{
 if(c.role==="admin") return;
-coachList.innerHTML+=`
+container.innerHTML+=`
 <div style="background:#111827;padding:5px;margin-bottom:5px;border-radius:8px;">
 <b>${c.user}</b> - ${c.specialty}
 <br>
@@ -208,15 +205,19 @@ coachList.innerHTML+=`
 });
 }
 
-/* ===== PRUEBAS ===== */
-
+/* ===== PRUEBA ===== */
 function activateTest(){
-if(!testName.value || !testDate.value) return alert("Complete datos");
+let name=testName.value;
+let date=testDate.value;
+if(!name || !date){
+alert("Complete nombre y fecha");
+return;
+}
 
 currentTest={
-name:testName.value,
+name:name,
 distance:testDistance.value,
-date:testDate.value,
+date:date,
 coach:loggedUser.user,
 results:[]
 };
@@ -224,22 +225,21 @@ results:[]
 allTests.push(currentTest);
 localStorage.setItem("allTests",JSON.stringify(allTests));
 
-activeTestInfo.innerHTML=`Activa: ${currentTest.name} | Entrenador: ${loggedUser.user}`;
-renderTests();
+activeTestInfo.innerHTML=
+`Activa: ${name} | Entrenador: ${loggedUser.user}`;
 }
 
-function renderTests(){}
-
-/* ===== CRONO ===== */
-
+/* ===== CRONOMETRO ===== */
 let laneTimers={},results=[],interval;
 
 function startCompetition(){
 lanes.innerHTML="";
 laneTimers={};
 results=[];
+
 for(let i=1;i<=laneCount.value;i++){
 laneTimers[i]={finished:false,time:0};
+
 lanes.innerHTML+=`
 <div class="lane">
 Carril ${i}
@@ -252,12 +252,14 @@ Carril ${i}
 function startRaceNow(){
 let startTime=Date.now();
 clearInterval(interval);
+
 interval=setInterval(()=>{
 let t=Date.now()-startTime;
+
 for(let i in laneTimers){
 if(!laneTimers[i].finished){
 laneTimers[i].time=t;
-time${i}.innerText=(t/1000).toFixed(3);
+document.getElementById("time"+i).innerText=(t/1000).toFixed(3);
 }
 }
 },10);
@@ -269,15 +271,17 @@ ranking.innerHTML="";
 for(let i in laneTimers){
 laneTimers[i].finished=false;
 laneTimers[i].time=0;
-time${i}.innerText="0.000";
+let el=document.getElementById("time"+i);
+if(el) el.innerText="0.000";
 }
 }
 
 function finishLane(i){
 if(laneTimers[i].finished) return;
-laneTimers[i].finished=true;
 
+laneTimers[i].finished=true;
 let final=laneTimers[i].time/1000;
+
 results.push({lane:i,time:final});
 
 if(currentTest){
@@ -297,9 +301,11 @@ ranking.innerHTML+=`${i+1}° Carril ${r.lane} - ${r.time.toFixed(3)}s<br>`;
 }
 
 /* ===== PDF ===== */
-
 async function downloadCurrentTest(){
-if(!currentTest) return alert("No hay prueba activa");
+if(!currentTest){
+alert("No hay prueba activa");
+return;
+}
 
 const { jsPDF } = window.jspdf;
 const doc = new jsPDF();

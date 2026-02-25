@@ -38,76 +38,107 @@ input,select{width:100%;padding:8px;margin:5px 0;border-radius:8px;border:none;}
 <button class="btn-danger" onclick="logout()">Cerrar Sesión</button>
 
 <div class="card">
-<h3>📥 Descargas Profesionales (PDF)</h3>
+<h3>Entrenadores</h3>
+<input type="text" id="newCoachName" placeholder="Nombre del Entrenador">
+<input type="file" id="newCoachFirma" accept="image/*">
+<button class="btn-success" onclick="createCoach()">Crear Entrenador</button>
+<select id="coachSelect"></select>
+</div>
 
+<div class="card">
+<h3>📥 Descargas Profesionales (PDF)</h3>
 <input type="file" id="logoInput" accept="image/*">
 <label>Logo Institucional</label>
-
-<input type="file" id="firmaInput" accept="image/*">
-<label>Firma del Entrenador</label>
-
-<input type="text" id="coachName" placeholder="Nombre del Entrenador">
-
 <button class="btn" onclick="downloadFull()">Descargar Historial Completo</button>
+<select id="downloadTestSelect"></select>
+<button class="btn-danger" onclick="downloadByTest()">Descargar por Prueba</button>
 </div>
 
 </div>
 
 <script>
 
-/* ===== DATOS DEMO ===== */
-let allTests=[
-{
+/* ===== BASE ===== */
+function safeParse(key){
+try{return JSON.parse(localStorage.getItem(key))||[];}
+catch{return [];}
+}
+
+let allTests=safeParse("allTests");
+let coaches=safeParse("coaches");
+
+/* ===== LOGIN ===== */
+function login(){
+document.getElementById("loginCard").classList.add("hidden");
+document.getElementById("app").classList.remove("hidden");
+renderAll();
+}
+function logout(){location.reload();}
+
+/* ===== ENTRENADORES ===== */
+function createCoach(){
+let nombre=document.getElementById("newCoachName").value;
+let firmaFile=document.getElementById("newCoachFirma").files[0];
+
+if(!nombre) return alert("Ingrese nombre del entrenador");
+
+if(coaches.some(c=>c.name===nombre)){
+alert("Ya existe ese entrenador");
+return;
+}
+
+if(firmaFile){
+let reader=new FileReader();
+reader.onload=function(){
+coaches.push({name:nombre,firma:reader.result});
+localStorage.setItem("coaches",JSON.stringify(coaches));
+renderCoaches();
+}
+reader.readAsDataURL(firmaFile);
+}else{
+coaches.push({name:nombre,firma:null});
+localStorage.setItem("coaches",JSON.stringify(coaches));
+renderCoaches();
+}
+}
+
+function renderCoaches(){
+coachSelect.innerHTML="";
+coaches.forEach((c,i)=>{
+coachSelect.innerHTML+=`<option value="${i}">${c.name}</option>`;
+});
+}
+
+/* ===== PRUEBAS DEMO SI NO HAY ===== */
+if(allTests.length===0){
+allTests.push({
 name:"100m Libre",
 distance:100,
 date:"2026-02-25",
 results:[
 {athlete:"Juan",time:55.321},
-{athlete:"Pedro",time:57.112},
-{athlete:"Juan",time:54.980}
+{athlete:"Pedro",time:57.112}
 ]
+});
+localStorage.setItem("allTests",JSON.stringify(allTests));
 }
-];
 
-/* ===== GENERAR TEXTO REPORTE ===== */
-
+/* ===== TEXTO REPORTE ===== */
 function generarTexto(test){
 
 let texto=`PRUEBA: ${test.name}\n`;
 texto+=`Distancia: ${test.distance} m\n`;
 texto+=`Fecha: ${test.date}\n\n`;
 
-let agrupado={};
-
 test.results.forEach(r=>{
-if(!agrupado[r.athlete]){
-agrupado[r.athlete]=[];
-}
-agrupado[r.athlete].push(r.time);
+texto+=`${r.athlete} - ${r.time.toFixed(3)} s\n`;
 });
 
-for(let atleta in agrupado){
-
-let tiempos=agrupado[atleta];
-let intentos=tiempos.length;
-let mejor=Math.min(...tiempos);
-let peor=Math.max(...tiempos);
-let promedio=tiempos.reduce((a,b)=>a+b,0)/intentos;
-
-texto+=`ATLETA: ${atleta}\n`;
-texto+=`Intentos: ${intentos}\n`;
-texto+=`Tiempos: ${tiempos.map(t=>t.toFixed(3)).join(" - ")}\n`;
-texto+=`Mejor Tiempo: ${mejor.toFixed(3)} s\n`;
-texto+=`Peor Tiempo: ${peor.toFixed(3)} s\n`;
-texto+=`Promedio: ${promedio.toFixed(3)} s\n`;
-texto+="----------------------------------------\n\n";
-}
-
+texto+="\n----------------------------------------\n\n";
 return texto;
 }
 
 /* ===== PDF PROFESIONAL ===== */
-
 async function generarPDF(texto,nombreArchivo){
 
 const { jsPDF } = window.jspdf;
@@ -115,14 +146,14 @@ const doc = new jsPDF();
 
 let pageWidth = doc.internal.pageSize.getWidth();
 let pageHeight = doc.internal.pageSize.getHeight();
-let y = 20;
+let y=20;
 
-/* ===== FECHA Y HORA AUTOMÁTICA ===== */
-let now = new Date();
-let fechaGeneracion = now.toLocaleDateString();
-let horaGeneracion = now.toLocaleTimeString();
+/* FECHA Y HORA */
+let now=new Date();
+let fecha=now.toLocaleDateString();
+let hora=now.toLocaleTimeString();
 
-/* ===== LOGO ===== */
+/* LOGO */
 let logo=document.getElementById("logoInput").files[0];
 if(logo){
 let base=await fileToBase64(logo);
@@ -133,11 +164,11 @@ doc.setFontSize(14);
 doc.text("REPORTE OFICIAL",pageWidth/2,25,null,null,"center");
 
 doc.setFontSize(9);
-doc.text(`Generado el: ${fechaGeneracion} ${horaGeneracion}`,pageWidth-15,15,null,null,"right");
+doc.text(`Generado el: ${fecha} ${hora}`,pageWidth-15,15,null,null,"right");
 
 y=40;
 
-/* ===== CONTENIDO DINÁMICO ===== */
+/* CONTENIDO */
 let lines=doc.splitTextToSize(texto,180);
 
 lines.forEach(l=>{
@@ -149,39 +180,30 @@ doc.text(l,15,y);
 y+=6;
 });
 
-/* ===== ENTRENADOR EN ÚLTIMA PÁGINA ===== */
-let firma=document.getElementById("firmaInput").files[0];
-let coach=document.getElementById("coachName").value;
-
-let totalPages = doc.getNumberOfPages();
+/* ENTRENADOR SOLO ÚLTIMA PÁGINA */
+let totalPages=doc.getNumberOfPages();
 doc.setPage(totalPages);
 
-let finalY = pageHeight - 40;
+let coachIndex=document.getElementById("coachSelect").value;
+let coach=coaches[coachIndex];
+
+let finalY=pageHeight-40;
 
 doc.setFontSize(10);
-doc.line(20, finalY, 100, finalY);
+doc.line(20,finalY,100,finalY);
 
 if(coach){
-doc.text(`Entrenador: ${coach}`,20,finalY+8);
+doc.text(`Entrenador: ${coach.name}`,20,finalY+8);
+if(coach.firma){
+doc.addImage(coach.firma,"PNG",20,finalY-25,60,20);
+}
 }
 
-if(firma){
-let base=await fileToBase64(firma);
-doc.addImage(base,"PNG",20,finalY-25,60,20);
-}
-
-/* ===== NUMERACIÓN DE PÁGINAS ===== */
+/* NUMERACIÓN */
 for(let i=1;i<=totalPages;i++){
 doc.setPage(i);
 doc.setFontSize(9);
-doc.text(
-`Página ${i} de ${totalPages}`,
-pageWidth-15,
-pageHeight-10,
-null,
-null,
-"right"
-);
+doc.text(`Página ${i} de ${totalPages}`,pageWidth-15,pageHeight-10,null,null,"right");
 }
 
 doc.save(nombreArchivo+".pdf");
@@ -196,21 +218,33 @@ reader.onerror=error=>rej(error);
 });
 }
 
-/* ===== DESCARGA ===== */
-
+/* ===== DESCARGAS ===== */
 function downloadFull(){
 let texto="";
 allTests.forEach(t=>texto+=generarTexto(t)+"\n");
 generarPDF(texto,"historial_completo");
 }
 
-function login(){
-document.getElementById("loginCard").classList.add("hidden");
-document.getElementById("app").classList.remove("hidden");
+function downloadByTest(){
+let index=downloadTestSelect.value;
+let test=allTests[index];
+if(!test) return alert("Seleccione prueba");
+generarPDF(generarTexto(test),"historial_"+test.name);
 }
 
-function logout(){location.reload();}
+function renderTests(){
+downloadTestSelect.innerHTML="";
+allTests.forEach((t,i)=>{
+downloadTestSelect.innerHTML+=`<option value="${i}">${t.name} - ${t.date}</option>`;
+});
+}
+
+function renderAll(){
+renderCoaches();
+renderTests();
+}
 
 </script>
 </body>
 </html>
+

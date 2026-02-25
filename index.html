@@ -5,6 +5,8 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Sistema Competencia Elite PRO MAX</title>
 
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+
 <style>
 body{margin:0;font-family:sans-serif;background:#0f172a;color:white;padding:10px;}
 .card{background:#1f2937;padding:15px;border-radius:15px;margin-bottom:15px;}
@@ -17,7 +19,9 @@ button{padding:10px;margin:5px 0;border:none;border-radius:10px;font-weight:bold
 .timeDisplay{font-size:22px;font-weight:bold;margin:10px 0;}
 .hidden{display:none}
 input,select{width:100%;padding:8px;margin:5px 0;border-radius:8px;border:none;}
-.small-btn{padding:5px;font-size:12px;margin-top:5px;width:auto;margin-right:5px;}
+.small-btn{padding:5px;font-size:12px;width:auto;margin-right:5px;}
+table{width:100%;border-collapse:collapse;margin-top:10px;}
+th,td{border:1px solid #334155;padding:6px;text-align:center;}
 </style>
 </head>
 <body>
@@ -27,18 +31,14 @@ input,select{width:100%;padding:8px;margin:5px 0;border-radius:8px;border:none;}
 <div id="loginCard" class="card">
 <h3>Iniciar Sesión</h3>
 <input type="text" id="loginUser" placeholder="Usuario">
-<input type="password" id="loginPass" placeholder="Contraseña">
 <button class="btn" onclick="login()">Ingresar</button>
 </div>
 
 <div id="app" class="hidden">
 
-<button class="btn-danger" onclick="logout()">Cerrar Sesión</button>
-
 <div class="card">
 <h3>Atletas</h3>
 <input type="text" id="newAthleteUser" placeholder="Nombre atleta">
-<input type="password" id="newAthletePass" placeholder="Contraseña">
 <input type="number" id="newAthleteAge" placeholder="Edad">
 <select id="newAthleteSex">
 <option value="">Sexo</option>
@@ -73,19 +73,14 @@ input,select{width:100%;padding:8px;margin:5px 0;border-radius:8px;border:none;}
 </div>
 
 <div class="card">
-<h3>📥 Descargas Profesionales</h3>
+<h3>📊 Estadísticas Visuales</h3>
+<div id="statsTable"></div>
+</div>
 
-<button class="btn" onclick="downloadFull()">Descargar Historial Completo</button>
-
-<select id="downloadAthleteSelect"></select>
-<button class="btn-success" onclick="downloadByAthlete()">Descargar por Atleta</button>
-
-<input type="date" id="downloadDate">
-<button class="btn-warning" onclick="downloadByDate()">Descargar por Fecha</button>
-
-<select id="downloadTestSelect"></select>
-<button class="btn-danger" onclick="downloadByTest()">Descargar por Prueba</button>
-
+<div class="card">
+<h3>📈 Progreso del Atleta</h3>
+<select id="graphAthleteSelect" onchange="renderGraph()"></select>
+<canvas id="progressChart"></canvas>
 </div>
 
 </div>
@@ -102,6 +97,7 @@ catch{return [];}
 let athletes=safeParse("athletes");
 let allTests=safeParse("allTests");
 let currentTest=null;
+let chart=null;
 
 function login(){
 loginCard.classList.add("hidden");
@@ -109,14 +105,12 @@ app.classList.remove("hidden");
 renderAll();
 }
 
-function logout(){location.reload();}
-
 /* ================= ATLETAS ================= */
 
 function createAthlete(){
+if(!newAthleteUser.value)return;
 athletes.push({
 user:newAthleteUser.value,
-pass:newAthletePass.value,
 age:newAthleteAge.value||"",
 sex:newAthleteSex.value||""
 });
@@ -124,12 +118,33 @@ localStorage.setItem("athletes",JSON.stringify(athletes));
 renderAthletes();
 }
 
+function editAthlete(index){
+let a=athletes[index];
+let nombre=prompt("Editar nombre:",a.user);
+if(!nombre)return;
+let edad=prompt("Editar edad:",a.age);
+let sexo=prompt("Editar sexo:",a.sex);
+athletes[index]={user:nombre,age:edad||"",sex:sexo||""};
+localStorage.setItem("athletes",JSON.stringify(athletes));
+renderAthletes();
+}
+
+function deleteAthlete(index){
+if(!confirm("Eliminar atleta?"))return;
+athletes.splice(index,1);
+localStorage.setItem("athletes",JSON.stringify(athletes));
+renderAthletes();
+}
+
 function renderAthletes(){
 athleteList.innerHTML="";
-downloadAthleteSelect.innerHTML="";
-athletes.forEach(a=>{
-athleteList.innerHTML+=`${a.user} | Edad:${a.age||"-"} | Sexo:${a.sex||"-"}<br>`;
-downloadAthleteSelect.innerHTML+=`<option value="${a.user}">${a.user}</option>`;
+graphAthleteSelect.innerHTML="";
+athletes.forEach((a,i)=>{
+athleteList.innerHTML+=`
+${a.user} | Edad:${a.age||"-"} | Sexo:${a.sex||"-"}
+<button class="small-btn btn-warning" onclick="editAthlete(${i})">Editar</button>
+<button class="small-btn btn-danger" onclick="deleteAthlete(${i})">Eliminar</button><br>`;
+graphAthleteSelect.innerHTML+=`<option>${a.user}</option>`;
 });
 }
 
@@ -145,19 +160,11 @@ results:[]
 allTests.push(currentTest);
 localStorage.setItem("allTests",JSON.stringify(allTests));
 activeTestInfo.innerHTML=`Activa: ${currentTest.name}`;
-renderTests();
-}
-
-function renderTests(){
-downloadTestSelect.innerHTML="";
-allTests.forEach((t,i)=>{
-downloadTestSelect.innerHTML+=`<option value="${i}">${t.name} - ${t.date}</option>`;
-});
 }
 
 /* ================= CRONOMETRO ================= */
 
-let laneTimers={},results=[],raceStarted=false,startTime=0,interval;
+let laneTimers={},results=[],interval,startTime;
 
 function startCompetition(){
 lanes.innerHTML="";
@@ -179,7 +186,6 @@ Carril ${i}
 }
 
 function startRaceNow(){
-raceStarted=true;
 startTime=Date.now();
 interval=setInterval(()=>{
 let t=Date.now()-startTime;
@@ -216,6 +222,8 @@ localStorage.setItem("allTests",JSON.stringify(allTests));
 }
 
 renderRanking();
+renderStats();
+renderGraph();
 }
 
 function renderRanking(){
@@ -226,87 +234,64 @@ ranking.innerHTML+=`${i+1}° ${r.name} - ${r.time.toFixed(3)}s<br>`;
 });
 }
 
-/* ================= ESTADISTICAS ================= */
+/* ================= TABLA ESTADISTICAS ================= */
 
-function calcularEstadisticas(test){
+function renderStats(){
+if(!currentTest)return;
 let agrupado={};
-test.results.forEach(r=>{
-if(!agrupado[r.athlete]) agrupado[r.athlete]=[];
+currentTest.results.forEach(r=>{
+if(!agrupado[r.athlete])agrupado[r.athlete]=[];
 agrupado[r.athlete].push(r.time);
 });
-return agrupado;
-}
 
-function generarTexto(test){
-let texto=`PRUEBA: ${test.name}\nFecha: ${test.date}\n\n`;
-let datos=calcularEstadisticas(test);
+let html="<table><tr><th>Atleta</th><th>Intentos</th><th>Mejor</th><th>Peor</th><th>Promedio</th></tr>";
 
-for(let atleta in datos){
-let info=athletes.find(a=>a.user===atleta)||{};
-let tiempos=datos[atleta];
+for(let atleta in agrupado){
+let tiempos=agrupado[atleta];
 let promedio=tiempos.reduce((a,b)=>a+b)/tiempos.length;
-let mejor=Math.min(...tiempos);
-let peor=Math.max(...tiempos);
-
-texto+=`Atleta: ${atleta}\nEdad:${info.age||"-"} Sexo:${info.sex||"-"}\n`;
-texto+=`Intentos:${tiempos.length}\n`;
-texto+=`Tiempos:${tiempos.map(t=>t.toFixed(3)).join(" - ")}\n`;
-texto+=`Mejor:${mejor.toFixed(3)} Peor:${peor.toFixed(3)} Promedio:${promedio.toFixed(3)}\n`;
-texto+="----------------------\n";
+html+=`<tr>
+<td>${atleta}</td>
+<td>${tiempos.length}</td>
+<td>${Math.min(...tiempos).toFixed(3)}</td>
+<td>${Math.max(...tiempos).toFixed(3)}</td>
+<td>${promedio.toFixed(3)}</td>
+</tr>`;
 }
 
-return texto;
+html+="</table>";
+statsTable.innerHTML=html;
 }
 
-/* ================= DESCARGAS ================= */
+/* ================= GRAFICO ================= */
 
-function descargar(texto,nombre){
-let blob=new Blob([texto],{type:"text/plain"});
-let a=document.createElement("a");
-a.href=URL.createObjectURL(blob);
-a.download=nombre;
-a.click();
-}
+function renderGraph(){
+let atleta=graphAthleteSelect.value;
+let tiempos=[];
 
-function downloadFull(){
-let texto="";
-allTests.forEach(t=>texto+=generarTexto(t)+"\n");
-descargar(texto,"historial_completo.txt");
-}
-
-function downloadByAthlete(){
-let atleta=downloadAthleteSelect.value;
-let texto="";
 allTests.forEach(t=>{
-let filtrado=t.results.filter(r=>r.athlete===atleta);
-if(filtrado.length>0){
-let copia={...t,results:filtrado};
-texto+=generarTexto(copia)+"\n";
+t.results.forEach(r=>{
+if(r.athlete===atleta)tiempos.push(r.time);
+});
+});
+
+if(chart)chart.destroy();
+
+chart=new Chart(document.getElementById("progressChart"),{
+type:"line",
+data:{
+labels:tiempos.map((_,i)=>"Intento "+(i+1)),
+datasets:[{
+label:"Progreso de tiempos",
+data:tiempos,
+borderColor:"lime",
+backgroundColor:"rgba(0,255,0,0.2)"
+}]
 }
 });
-descargar(texto,`historial_${atleta}.txt`);
-}
-
-function downloadByDate(){
-let fecha=downloadDate.value;
-let texto="";
-allTests.forEach(t=>{
-if(t.date===fecha){
-texto+=generarTexto(t)+"\n";
-}
-});
-descargar(texto,`historial_${fecha}.txt`);
-}
-
-function downloadByTest(){
-let index=downloadTestSelect.value;
-let test=allTests[index];
-descargar(generarTexto(test),`historial_${test.name}.txt`);
 }
 
 function renderAll(){
 renderAthletes();
-renderTests();
 }
 
 </script>

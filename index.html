@@ -275,15 +275,19 @@ document.getElementById("time"+i).innerText=(t/1000).toFixed(3);
 }
 
 function resetRace(){
+
 clearInterval(interval);
+
 results=[];
 ranking.innerHTML="";
 
 for(let i in laneTimers){
 laneTimers[i].finished=false;
 laneTimers[i].time=0;
-document.getElementById("time"+i).innerText="0.000";
+let el=document.getElementById("time"+i);
+if(el) el.innerText="0.000";
 }
+
 }
 
 function finishLane(i){

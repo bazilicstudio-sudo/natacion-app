@@ -427,17 +427,36 @@ generarPDF(texto,"historial_completo");
 }
 
 function downloadByAthlete(){
-let atleta=downloadAthleteSelect.value;
-let texto="";
-allTests.forEach(t=>{
-let filtrado=t.results.filter(r=>r.athlete===atleta);
-filtrado.forEach(f=>{
-texto+=`${atleta} - ${f.time.toFixed(3)}s\n`;
-});
-});
-generarPDF(texto,"historial_"+atleta);
+
+let atleta = downloadAthleteSelect.value;
+if(!atleta) return alert("Seleccione atleta");
+
+let texto = "";
+
+allTests.forEach(test => {
+
+let resultadosAtleta = test.results.filter(r => r.athlete === atleta);
+
+if(resultadosAtleta.length > 0){
+
+let testFiltrado = {
+name: test.name,
+distance: test.distance,
+date: test.date,
+results: resultadosAtleta
+};
+
+texto += generarTexto(testFiltrado) + "\n";
 }
 
+});
+
+if(texto === ""){
+return alert("No hay registros para este atleta");
+}
+
+generarPDF(texto,"historial_"+atleta);
+}
 function downloadByDate(){
 let fecha=downloadDate.value;
 let texto="";

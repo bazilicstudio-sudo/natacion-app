@@ -335,85 +335,88 @@ return texto;
 /* ===== PDF ===== */
 
 async function generarPDF(texto,nombreArchivo){
+
 const { jsPDF } = window.jspdf;
 const doc = new jsPDF();
 
-let pageWidth = doc.internal.pageSize.getWidth();
-let pageHeight = doc.internal.pageSize.getHeight();
+const pageWidth = doc.internal.pageSize.getWidth();
+const pageHeight = doc.internal.pageSize.getHeight();
 
-let y = 20;
+let y = 40;
 
-/* ===== FECHA Y HORA AUTOMÁTICA ===== */
-let ahora = new Date();
-let fechaHora = ahora.toLocaleString();
+/* ===== FECHA Y HORA ===== */
+const ahora = new Date();
+const fechaHora = ahora.toLocaleString();
 
 /* ===== LOGO ===== */
-let logo=document.getElementById("logoInput").files[0];
+let logo = document.getElementById("logoInput").files[0];
 if(logo){
-let base=await fileToBase64(logo);
-doc.addImage(base,"PNG",15,10,40,20);
+let baseLogo = await fileToBase64(logo);
+doc.addImage(baseLogo,"PNG",15,10,40,20);
 }
 
+/* ===== TITULO ===== */
 doc.setFontSize(14);
-doc.text("REPORTE OFICIAL",pageWidth/2,25,null,null,"center");
+doc.text("REPORTE OFICIAL", pageWidth/2, 20, {align:"center"});
 
 doc.setFontSize(9);
-doc.text("Generado: "+fechaHora,pageWidth-15,15,null,null,"right");
-
-y=40;
+doc.text("Generado: " + fechaHora, pageWidth - 15, 15, {align:"right"});
 
 /* ===== CONTENIDO ===== */
-let lines=doc.splitTextToSize(texto,180);
+doc.setFontSize(10);
+let lines = doc.splitTextToSize(texto, 180);
 
-lines.forEach(l=>{
-if(y>pageHeight-20){
+lines.forEach(line => {
+if (y > pageHeight - 30) {
 doc.addPage();
-y=20;
+y = 20;
 }
-doc.text(l,15,y);
-y+=6;
+doc.text(line, 15, y);
+y += 6;
 });
 
-/* ===== NUMERACIÓN DE PÁGINAS ===== */
-let totalPages = doc.getNumberOfPages();
+/* ===== DATOS FIRMA ===== */
+let firma = document.getElementById("firmaInput").files[0];
+let coach = document.getElementById("coachName").value;
 
-for (let i = 1; i <= totalPages; i++) {
+/* ===== IR A ULTIMA PAGINA ===== */
+let totalPages = doc.getNumberOfPages();
+doc.setPage(totalPages);
+
+/* Posición firma */
+let firmaY = pageHeight - 40;
+
+/* Línea firma */
+doc.line(20, firmaY, 80, firmaY);
+doc.setFontSize(9);
+doc.text("Firma Entrenador", 20, firmaY + 5);
+
+/* Imagen firma */
+if(firma){
+let baseFirma = await fileToBase64(firma);
+doc.addImage(baseFirma,"PNG",20,firmaY - 25,60,25);
+}
+
+/* Nombre entrenador */
+if(coach){
+doc.text(coach, 20, firmaY + 12);
+}
+
+/* ===== NUMERACION FINAL (SIEMPRE AL FINAL) ===== */
+totalPages = doc.getNumberOfPages();
+
+for(let i=1; i<=totalPages; i++){
 doc.setPage(i);
 doc.setFontSize(9);
 doc.text(
-`Página ${i} de ${totalPages}`,
+"Página " + i + " de " + totalPages,
 pageWidth/2,
-pageHeight-10,
-null,
-null,
-"center"
+pageHeight - 10,
+{align:"center"}
 );
 }
 
-/* ===== FIRMA Y ENTRENADOR SOLO EN ÚLTIMA PÁGINA ===== */
-doc.setPage(totalPages);
-
-let firma=document.getElementById("firmaInput").files[0];
-let coach=document.getElementById("coachName").value;
-
-let firmaY = pageHeight - 50;
-
-/* Línea para firma */
-doc.line(20, firmaY, 80, firmaY);
-
-doc.setFontSize(10);
-doc.text("Firma Entrenador",20,firmaY+5);
-
-if(firma){
-let base=await fileToBase64(firma);
-doc.addImage(base,"PNG",20,firmaY-25,60,25);
-}
-
-if(coach){
-doc.text(coach,20,firmaY+12);
-}
-
-doc.save(nombreArchivo+".pdf");
+doc.save(nombreArchivo + ".pdf");
 }
 /* ===== DESCARGAS ===== */
 

@@ -1,252 +1,429 @@
 <!DOCTYPE html>
-<html>
+<html lang="es">
 <head>
 <meta charset="UTF-8">
-<title>Plataforma Natación Pro</title>
-<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Sistema Competencia Elite PRO MAX</title>
+
 <style>
-body{font-family:Arial;background:#0f172a;color:white;padding:20px}
-input,select,button{margin:5px;padding:6px;border-radius:6px;border:none}
-button{cursor:pointer}
+body{margin:0;font-family:sans-serif;background:#0f172a;color:white;padding:10px;}
+.card{background:#1f2937;padding:15px;border-radius:15px;margin-bottom:15px;}
+button{padding:10px;margin:5px 0;border:none;border-radius:10px;font-weight:bold;cursor:pointer;width:100%;}
 .btn{background:#2563eb;color:white}
+.btn-success{background:#16a34a;color:white}
 .btn-danger{background:#dc2626;color:white}
-.btn-warning{background:#f59e0b;color:black}
-.small-btn{padding:3px 6px;font-size:12px}
-.box{background:#1e293b;padding:15px;border-radius:10px;margin-bottom:20px}
+.btn-warning{background:#f59e0b;color:white}
+.lane{background:#111827;padding:15px;margin:10px 0;border-radius:15px;text-align:center;}
+.timeDisplay{font-size:22px;font-weight:bold;margin:10px 0;}
+.hidden{display:none}
+input,select{width:100%;padding:8px;margin:5px 0;border-radius:8px;border:none;}
+.small-btn{padding:5px;font-size:12px;margin-top:5px;width:auto;margin-right:5px;}
 </style>
 </head>
 <body>
 
-<h1>🏊 Plataforma Entrenador Natación</h1>
+<h2>🏊 Sistema Competencia Elite PRO MAX</h2>
 
-<!-- ENTRENADOR -->
-<div class="box">
-<h3>Entrenador</h3>
-<input type="text" id="coachName" placeholder="Nombre del Entrenador">
-<button class="btn" onclick="saveCoach()">Guardar Entrenador</button>
-<p id="coachDisplay"></p>
+<div id="loginCard" class="card">
+<h3>Iniciar Sesión</h3>
+<input type="text" id="loginUser" placeholder="Usuario">
+<input type="password" id="loginPass" placeholder="Contraseña">
+<button class="btn" onclick="login()">Ingresar</button>
 </div>
 
-<!-- ATLETAS -->
-<div class="box">
-<h3>Agregar Atleta</h3>
-<input type="text" id="athleteName" placeholder="Nombre">
-<input type="number" id="athleteAge" placeholder="Edad">
-<select id="athleteSex">
+<div id="app" class="hidden">
+
+<button class="btn-danger" onclick="logout()">Cerrar Sesión</button>
+
+<div class="card">
+<h3>Atletas</h3>
+<input type="text" id="newAthleteUser" placeholder="Nombre atleta">
+<input type="password" id="newAthletePass" placeholder="Contraseña">
+<input type="number" id="newAthleteAge" placeholder="Edad">
+<select id="newAthleteSex">
 <option value="">Sexo</option>
-<option>Masculino</option>
-<option>Femenino</option>
+<option value="Masculino">Masculino</option>
+<option value="Femenino">Femenino</option>
 </select>
-<button class="btn" onclick="addAthlete()">Agregar</button>
+<button class="btn-success" onclick="createAthlete()">Crear Atleta</button>
 <div id="athleteList"></div>
 </div>
 
-<!-- PRUEBAS -->
-<div class="box">
-<h3>Crear Prueba</h3>
-<input type="text" id="testName" placeholder="Nombre Prueba">
-<input type="number" id="testDistance" placeholder="Distancia (m)">
+<div class="card">
+<h3>📋 Datos de la Prueba</h3>
+<input type="text" id="testName" placeholder="Nombre prueba">
+<input type="number" id="testDistance" placeholder="Metros">
 <input type="date" id="testDate">
-<button class="btn" onclick="createTest()">Crear</button>
+<button class="btn-success" onclick="activateTest()">Activar Prueba</button>
+<div id="activeTestInfo"></div>
 </div>
 
-<!-- REGISTRO -->
-<div class="box">
-<h3>Registrar Tiempo</h3>
-<select id="testSelect"></select>
-<select id="athleteSelect"></select>
-<input type="number" id="timeInput" step="0.001" placeholder="Tiempo en segundos">
-<button class="btn" onclick="addResult()">Registrar</button>
+<div class="card">
+<h3>Competencia</h3>
+<input type="number" id="laneCount" value="4" min="2" max="10">
+<button class="btn-success" onclick="startCompetition()">Crear Carriles</button>
+<button class="btn-success" onclick="startRaceNow()">🚦 INICIAR</button>
+<button class="btn-danger" onclick="resetRace()">🔄 Reiniciar</button>
+<div id="lanes"></div>
 </div>
 
-<!-- DESCARGA -->
-<div class="box">
-<h3>Descargar PDF</h3>
+<div class="card">
+<h3>Ranking</h3>
+<div id="ranking"></div>
+</div>
 
-<select id="filterAthlete">
-<option value="">Todos los atletas</option>
-</select>
+<div class="card">
+<h3>📥 Descargas Profesionales</h3>
+
+<button class="btn" onclick="downloadFull()">Descargar Historial Completo</button>
+
+<select id="downloadAthleteSelect"></select>
+<button class="btn-success" onclick="downloadByAthlete()">Descargar por Atleta</button>
 
 <input type="date" id="downloadDate">
+<button class="btn-warning" onclick="downloadByDate()">Descargar por Fecha</button>
 
-<button class="btn-warning" onclick="downloadByFilter()">Descargar Reporte</button>
+<select id="downloadTestSelect"></select>
+<button class="btn-danger" onclick="downloadByTest()">Descargar por Prueba</button>
+
+</div>
+
 </div>
 
 <script>
 
-let athletes=[]
-let allTests=[]
-let coach=""
+/* ================= BASE ================= */
 
-function saveData(){
-localStorage.setItem("athletes",JSON.stringify(athletes))
-localStorage.setItem("tests",JSON.stringify(allTests))
-localStorage.setItem("coach",coach)
+function safeParse(key){
+try{return JSON.parse(localStorage.getItem(key))||[];}
+catch{return [];}
 }
 
-function loadData(){
-athletes=JSON.parse(localStorage.getItem("athletes"))||[]
-allTests=JSON.parse(localStorage.getItem("tests"))||[]
-coach=localStorage.getItem("coach")||""
-document.getElementById("coachDisplay").innerText=coach? "Entrenador: "+coach:""
-renderAthletes()
-renderTests()
+let athletes=safeParse("athletes");
+let allTests=safeParse("allTests");
+let currentTest=null;
+
+function login(){
+loginCard.classList.add("hidden");
+app.classList.remove("hidden");
+renderAll();
 }
 
-function saveCoach(){
-coach=document.getElementById("coachName").value
-saveData()
-document.getElementById("coachDisplay").innerText="Entrenador: "+coach
+function logout(){location.reload();}
+
+/* ================= ATLETAS ================= */
+
+function createAthlete(){
+
+if(!newAthleteUser.value) return alert("Ingrese nombre");
+
+if(athletes.some(a=>a.user===newAthleteUser.value)){
+alert("Ya existe un atleta con ese nombre");
+return;
 }
 
-function addAthlete(){
-let name=document.getElementById("athleteName").value.trim()
-let age=document.getElementById("athleteAge").value
-let sex=document.getElementById("athleteSex").value
+athletes.push({
+user:newAthleteUser.value,
+pass:newAthletePass.value,
+age:newAthleteAge.value||"",
+sex:newAthleteSex.value||""
+});
 
-if(!name)return alert("Nombre requerido")
-if(athletes.some(a=>a.user===name))return alert("Ya existe")
+localStorage.setItem("athletes",JSON.stringify(athletes));
+renderAthletes();
+}
 
-athletes.push({user:name,age,sex})
-saveData()
-renderAthletes()
+function editAthlete(index){
+let nuevoNombre=prompt("Nuevo nombre:",athletes[index].user);
+if(!nuevoNombre) return;
+
+if(athletes.some((a,i)=>a.user===nuevoNombre && i!==index)){
+alert("Ya existe otro atleta con ese nombre");
+return;
+}
+
+let nuevaEdad=prompt("Nueva edad:",athletes[index].age);
+let nuevoSexo=prompt("Nuevo sexo:",athletes[index].sex);
+
+let nombreAnterior=athletes[index].user;
+
+athletes[index].user=nuevoNombre;
+athletes[index].age=nuevaEdad;
+athletes[index].sex=nuevoSexo;
+
+/* actualizar registros históricos */
+allTests.forEach(t=>{
+t.results.forEach(r=>{
+if(r.athlete===nombreAnterior){
+r.athlete=nuevoNombre;
+}
+});
+});
+
+localStorage.setItem("athletes",JSON.stringify(athletes));
+localStorage.setItem("allTests",JSON.stringify(allTests));
+
+renderAll();
+}
+
+function deleteAthlete(index){
+
+if(!confirm("¿Seguro que deseas eliminar este atleta?")) return;
+
+let nombre=athletes[index].user;
+
+athletes.splice(index,1);
+
+allTests.forEach(t=>{
+t.results=t.results.filter(r=>r.athlete!==nombre);
+});
+
+localStorage.setItem("athletes",JSON.stringify(athletes));
+localStorage.setItem("allTests",JSON.stringify(allTests));
+
+renderAll();
 }
 
 function renderAthletes(){
-document.getElementById("athleteList").innerHTML=""
-document.getElementById("athleteSelect").innerHTML=""
-document.getElementById("filterAthlete").innerHTML="<option value=''>Todos los atletas</option>"
+athleteList.innerHTML="";
+downloadAthleteSelect.innerHTML="";
 
-athletes.forEach((a,i)=>{
-document.getElementById("athleteList").innerHTML+=`
-<div>
-${a.user}
-<button class="small-btn btn-danger" onclick="deleteAthlete(${i})">Eliminar</button>
-</div>`
+athletes.forEach((a,index)=>{
+athleteList.innerHTML+=`
+<div style="margin-bottom:8px;padding:5px;background:#111827;border-radius:8px;">
+<b>${a.user}</b> | Edad:${a.age||"-"} | Sexo:${a.sex||"-"} <br>
+<button class="small-btn btn-warning" onclick="editAthlete(${index})">Editar</button>
+<button class="small-btn btn-danger" onclick="deleteAthlete(${index})">Eliminar</button>
+</div>
+`;
 
-document.getElementById("athleteSelect").innerHTML+=`<option>${a.user}</option>`
-document.getElementById("filterAthlete").innerHTML+=`<option>${a.user}</option>`
-})
+downloadAthleteSelect.innerHTML+=`<option value="${a.user}">${a.user}</option>`;
+});
 }
 
-function deleteAthlete(i){
-if(confirm("Eliminar atleta?")){
-athletes.splice(i,1)
-saveData()
-renderAthletes()
+/* ================= PRUEBAS ================= */
+
+function activateTest(){
+
+if(!testName.value || !testDate.value){
+alert("Complete nombre y fecha");
+return;
 }
-}
 
-function createTest(){
-let name=document.getElementById("testName").value
-let distance=document.getElementById("testDistance").value
-let date=document.getElementById("testDate").value
+currentTest={
+name:testName.value,
+distance:testDistance.value,
+date:testDate.value,
+results:[]
+};
 
-if(!name||!date)return alert("Faltan datos")
+allTests.push(currentTest);
 
-allTests.push({name,distance,date,results:[]})
-saveData()
-renderTests()
+localStorage.setItem("allTests",JSON.stringify(allTests));
+
+activeTestInfo.innerHTML=`Activa: ${currentTest.name}`;
+renderTests();
 }
 
 function renderTests(){
-document.getElementById("testSelect").innerHTML=""
+downloadTestSelect.innerHTML="";
 allTests.forEach((t,i)=>{
-document.getElementById("testSelect").innerHTML+=`<option value="${i}">${t.name} - ${t.date}</option>`
-})
+downloadTestSelect.innerHTML+=`<option value="${i}">${t.name} - ${t.date}</option>`;
+});
 }
 
-function addResult(){
-let testIndex=document.getElementById("testSelect").value
-let athlete=document.getElementById("athleteSelect").value
-let time=parseFloat(document.getElementById("timeInput").value)
+/* ================= CRONOMETRO ================= */
 
-if(!athlete||!time)return alert("Datos inválidos")
+let laneTimers={},results=[],raceStarted=false,startTime=0,interval;
 
-allTests[testIndex].results.push({athlete,time})
-saveData()
-alert("Tiempo registrado")
+function startCompetition(){
+lanes.innerHTML="";
+laneTimers={};
+results=[];
+
+for(let i=1;i<=laneCount.value;i++){
+
+laneTimers[i]={finished:false,time:0,athlete:null};
+
+let options=athletes.map(a=>`<option>${a.user}</option>`).join("");
+
+lanes.innerHTML+=`
+<div class="lane">
+Carril ${i}
+<select onchange="laneTimers[${i}].athlete=this.value">
+<option></option>${options}
+</select>
+<div class="timeDisplay" id="time${i}">0.000</div>
+<button onclick="finishLane(${i})">TOCAR</button>
+</div>`;
+}
 }
 
-function generarTextoFiltrado(atletaFiltro,fechaFiltro){
+function startRaceNow(){
+startTime=Date.now();
 
-let texto="REPORTE DE RENDIMIENTO\n\n"
-texto+="Entrenador: "+(coach||"No definido")+"\n\n"
+interval=setInterval(()=>{
+let t=Date.now()-startTime;
 
-let historialGlobal=[]
-
-allTests
-.sort((a,b)=>new Date(a.date)-new Date(b.date))
-.forEach(test=>{
-
-if(fechaFiltro && test.date!==fechaFiltro)return
-
-let resultados=test.results.filter(r=>{
-if(atletaFiltro)return r.athlete===atletaFiltro
-return true
-})
-
-if(resultados.length===0)return
-
-texto+=`PRUEBA: ${test.name}\n`
-texto+=`Distancia: ${test.distance} m\n`
-texto+=`Fecha: ${test.date}\n\n`
-
-let agrupado={}
-resultados.forEach(r=>{
-if(!agrupado[r.athlete])agrupado[r.athlete]=[]
-agrupado[r.athlete].push(r.time)
-})
-
-for(let atleta in agrupado){
-
-let tiempos=agrupado[atleta]
-let intentos=tiempos.length
-let mejor=Math.min(...tiempos)
-let promedio=tiempos.reduce((a,b)=>a+b,0)/intentos
-
-historialGlobal.push(...tiempos)
-
-let info=athletes.find(a=>a.user===atleta)||{}
-
-texto+=`Atleta: ${atleta}\n`
-texto+=`Edad: ${info.age||"-"}\n`
-texto+=`Sexo: ${info.sex||"-"}\n`
-texto+=`Intentos: ${intentos}\n`
-texto+=`Tiempos: ${tiempos.map(t=>t.toFixed(3)).join(" - ")}\n`
-texto+=`Mejor Tiempo: ${mejor.toFixed(3)}\n`
-texto+=`Promedio: ${promedio.toFixed(3)}\n`
-texto+="-------------------------\n\n"
+for(let i in laneTimers){
+if(!laneTimers[i].finished){
+laneTimers[i].time=t;
+document.getElementById("time"+i).innerText=(t/1000).toFixed(3);
+}
+}
+},10);
 }
 
-})
+function resetRace(){
 
-if(historialGlobal.length>=2){
-let primero=historialGlobal[0]
-let ultimo=historialGlobal[historialGlobal.length-1]
-let mejora=((primero-ultimo)/primero)*100
-texto+="MEJORA HISTÓRICA GLOBAL: "+mejora.toFixed(2)+" %\n"
+clearInterval(interval);
+
+results=[];
+ranking.innerHTML="";
+
+for(let i in laneTimers){
+laneTimers[i].finished=false;
+laneTimers[i].time=0;
+let el=document.getElementById("time"+i);
+if(el) el.innerText="0.000";
 }
 
-return texto
 }
 
-function downloadByFilter(){
+function finishLane(i){
 
-let atleta=document.getElementById("filterAthlete").value
-let fecha=document.getElementById("downloadDate").value
+if(laneTimers[i].finished) return;
 
-let texto=generarTextoFiltrado(atleta,fecha)
+laneTimers[i].finished=true;
 
-if(!texto)return alert("Sin datos")
+let final=laneTimers[i].time/1000;
+let name=laneTimers[i].athlete||"Sin atleta";
 
-const {jsPDF}=window.jspdf
-let doc=new jsPDF()
-doc.text(texto,10,10)
-doc.save("reporte.pdf")
+results.push({name,time:final});
+
+/* guardar correctamente */
+if(currentTest){
+
+let index=allTests.findIndex(t=>t.name===currentTest.name && t.date===currentTest.date);
+
+if(index!==-1){
+allTests[index].results.push({athlete:name,time:final});
+localStorage.setItem("allTests",JSON.stringify(allTests));
+}
 }
 
-loadData()
+renderRanking();
+}
+
+function renderRanking(){
+ranking.innerHTML="";
+results.sort((a,b)=>a.time-b.time);
+
+results.forEach((r,i)=>{
+ranking.innerHTML+=`${i+1}° ${r.name} - ${r.time.toFixed(3)}s<br>`;
+});
+}
+
+/* ================= ESTADISTICAS ================= */
+
+function calcularEstadisticas(test){
+let agrupado={};
+
+test.results.forEach(r=>{
+if(!agrupado[r.athlete]) agrupado[r.athlete]=[];
+agrupado[r.athlete].push(r.time);
+});
+
+return agrupado;
+}
+
+function generarTexto(test){
+
+if(!test || !test.results || test.results.length===0){
+return `PRUEBA: ${test?.name||"Sin nombre"}\nSin registros.\n\n`;
+}
+
+let texto=`PRUEBA: ${test.name}\nDistancia: ${test.distance||"-"}m\nFecha: ${test.date}\n\n`;
+
+let datos=calcularEstadisticas(test);
+
+for(let atleta in datos){
+
+let info=athletes.find(a=>a.user===atleta)||{};
+let tiempos=datos[atleta];
+
+let promedio=tiempos.reduce((a,b)=>a+b)/tiempos.length;
+let mejor=Math.min(...tiempos);
+let peor=Math.max(...tiempos);
+
+texto+=`Atleta: ${atleta}\n`;
+texto+=`Edad: ${info.age||"-"}\n`;
+texto+=`Sexo: ${info.sex||"-"}\n`;
+texto+=`Intentos: ${tiempos.length}\n`;
+texto+=`Tiempos: ${tiempos.map(t=>t.toFixed(3)).join(" - ")}\n`;
+texto+=`Mejor: ${mejor.toFixed(3)}\n`;
+texto+=`Peor: ${peor.toFixed(3)}\n`;
+texto+=`Promedio: ${promedio.toFixed(3)}\n`;
+texto+="----------------------------------\n";
+}
+
+return texto;
+}
+
+/* ================= DESCARGAS ================= */
+
+function descargar(texto,nombre){
+let blob=new Blob([texto],{type:"text/plain"});
+let a=document.createElement("a");
+a.href=URL.createObjectURL(blob);
+a.download=nombre;
+a.click();
+}
+
+function downloadFull(){
+let texto="";
+allTests.forEach(t=>texto+=generarTexto(t)+"\n");
+descargar(texto,"historial_completo.txt");
+}
+
+function downloadByAthlete(){
+let atleta=downloadAthleteSelect.value;
+let texto="";
+
+allTests.forEach(t=>{
+let filtrado=t.results.filter(r=>r.athlete===atleta);
+if(filtrado.length>0){
+let copia={...t,results:filtrado};
+texto+=generarTexto(copia)+"\n";
+}
+});
+
+descargar(texto,`historial_${atleta}.txt`);
+}
+
+function downloadByDate(){
+let fecha=downloadDate.value;
+let texto="";
+
+allTests.forEach(t=>{
+if(t.date===fecha){
+texto+=generarTexto(t)+"\n";
+}
+});
+
+descargar(texto,`historial_${fecha}.txt`);
+}
+
+function downloadByTest(){
+let index=downloadTestSelect.value;
+let test=allTests[index];
+descargar(generarTexto(test),`historial_${test.name}.txt`);
+}
+
+function renderAll(){
+renderAthletes();
+renderTests();
+}
 
 </script>
 </body>

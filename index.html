@@ -75,18 +75,26 @@ input,select{width:100%;padding:8px;margin:5px 0;border-radius:8px;border:none;}
 </div>
 
 <div class="card">
-<h3>📥 Descargas Profesionales</h3>
+<h3>📥 Descargas Profesionales (PDF)</h3>
 
-<button class="btn" onclick="downloadFull()">Descargar Historial Completo (PDF)</button>
+<input type="file" id="logoInput" accept="image/*">
+<label>Logo Institucional</label>
+
+<input type="file" id="firmaInput" accept="image/*">
+<label>Firma del Entrenador</label>
+
+<input type="text" id="coachName" placeholder="Nombre del Entrenador">
+
+<button class="btn" onclick="downloadFull()">Descargar Historial Completo</button>
 
 <select id="downloadAthleteSelect"></select>
-<button class="btn-success" onclick="downloadByAthlete()">Descargar por Atleta (PDF)</button>
+<button class="btn-success" onclick="downloadByAthlete()">Descargar por Atleta</button>
 
 <input type="date" id="downloadDate">
-<button class="btn-warning" onclick="downloadByDate()">Descargar por Fecha (PDF)</button>
+<button class="btn-warning" onclick="downloadByDate()">Descargar por Fecha</button>
 
 <select id="downloadTestSelect"></select>
-<button class="btn-danger" onclick="downloadByTest()">Descargar por Prueba (PDF)</button>
+<button class="btn-danger" onclick="downloadByTest()">Descargar por Prueba</button>
 
 </div>
 
@@ -94,7 +102,7 @@ input,select{width:100%;padding:8px;margin:5px 0;border-radius:8px;border:none;}
 
 <script>
 
-/* ================= BASE ================= */
+/* ===== BASE ===== */
 
 function safeParse(key){
 try{return JSON.parse(localStorage.getItem(key))||[];}
@@ -105,26 +113,29 @@ let athletes=safeParse("athletes");
 let allTests=safeParse("allTests");
 let currentTest=null;
 
+/* ===== LOGIN ===== */
+
 function login(){
-loginCard.classList.add("hidden");
-app.classList.remove("hidden");
+document.getElementById("loginCard").classList.add("hidden");
+document.getElementById("app").classList.remove("hidden");
 renderAll();
 }
 
 function logout(){location.reload();}
 
-/* ================= ATLETAS ================= */
+/* ===== ATLETAS ===== */
 
 function createAthlete(){
-if(!newAthleteUser.value) return alert("Ingrese nombre");
+let nombre=document.getElementById("newAthleteUser").value;
+if(!nombre) return alert("Ingrese nombre");
 
-if(athletes.some(a=>a.user===newAthleteUser.value)){
+if(athletes.some(a=>a.user===nombre)){
 alert("Ya existe un atleta con ese nombre");
 return;
 }
 
 athletes.push({
-user:newAthleteUser.value,
+user:nombre,
 pass:newAthletePass.value,
 age:newAthleteAge.value||"",
 sex:newAthleteSex.value||""
@@ -134,36 +145,64 @@ localStorage.setItem("athletes",JSON.stringify(athletes));
 renderAthletes();
 }
 
+function editAthlete(index){
+let nuevoNombre=prompt("Nuevo nombre:",athletes[index].user);
+if(!nuevoNombre) return;
+
+if(athletes.some((a,i)=>a.user===nuevoNombre && i!==index)){
+alert("Ya existe otro atleta con ese nombre");
+return;
+}
+
+athletes[index].user=nuevoNombre;
+localStorage.setItem("athletes",JSON.stringify(athletes));
+renderAll();
+}
+
+function deleteAthlete(index){
+if(!confirm("¿Eliminar atleta?")) return;
+let nombre=athletes[index].user;
+athletes.splice(index,1);
+
+allTests.forEach(t=>{
+t.results=t.results.filter(r=>r.athlete!==nombre);
+});
+
+localStorage.setItem("athletes",JSON.stringify(athletes));
+localStorage.setItem("allTests",JSON.stringify(allTests));
+renderAll();
+}
+
 function renderAthletes(){
 athleteList.innerHTML="";
 downloadAthleteSelect.innerHTML="";
 athletes.forEach((a,index)=>{
 athleteList.innerHTML+=`
-<div style="margin-bottom:8px;padding:5px;background:#111827;border-radius:8px;">
-<b>${a.user}</b> | Edad:${a.age||"-"} | Sexo:${a.sex||"-"}
+<div style="background:#111827;padding:5px;margin-bottom:5px;border-radius:8px;">
+<b>${a.user}</b>
+<button class="small-btn btn-warning" onclick="editAthlete(${index})">Editar</button>
+<button class="small-btn btn-danger" onclick="deleteAthlete(${index})">Eliminar</button>
 </div>`;
 downloadAthleteSelect.innerHTML+=`<option value="${a.user}">${a.user}</option>`;
 });
 }
 
-/* ================= PRUEBAS ================= */
+/* ===== PRUEBAS ===== */
 
 function activateTest(){
 if(!testName.value || !testDate.value){
 alert("Complete nombre y fecha");
 return;
 }
-
 currentTest={
 name:testName.value,
 distance:testDistance.value,
 date:testDate.value,
 results:[]
 };
-
 allTests.push(currentTest);
 localStorage.setItem("allTests",JSON.stringify(allTests));
-activeTestInfo.innerHTML=`Activa: ${currentTest.name}`;
+activeTestInfo.innerHTML="Activa: "+currentTest.name;
 renderTests();
 }
 
@@ -174,15 +213,14 @@ downloadTestSelect.innerHTML+=`<option value="${i}">${t.name} - ${t.date}</optio
 });
 }
 
-/* ================= CRONOMETRO ================= */
+/* ===== CRONO ===== */
 
-let laneTimers={},results=[],startTime=0,interval;
+let laneTimers={},results=[],interval;
 
 function startCompetition(){
 lanes.innerHTML="";
 laneTimers={};
 results=[];
-
 for(let i=1;i<=laneCount.value;i++){
 laneTimers[i]={finished:false,time:0,athlete:null};
 let options=athletes.map(a=>`<option>${a.user}</option>`).join("");
@@ -199,7 +237,8 @@ Carril ${i}
 }
 
 function startRaceNow(){
-startTime=Date.now();
+let startTime=Date.now();
+clearInterval(interval);
 interval=setInterval(()=>{
 let t=Date.now()-startTime;
 for(let i in laneTimers){
@@ -229,13 +268,9 @@ laneTimers[i].finished=true;
 let final=laneTimers[i].time/1000;
 let name=laneTimers[i].athlete||"Sin atleta";
 results.push({name,time:final});
-
 if(currentTest){
-let index=allTests.findIndex(t=>t.name===currentTest.name && t.date===currentTest.date);
-if(index!==-1){
-allTests[index].results.push({athlete:name,time:final});
+currentTest.results.push({athlete:name,time:final});
 localStorage.setItem("allTests",JSON.stringify(allTests));
-}
 }
 renderRanking();
 }
@@ -248,88 +283,98 @@ ranking.innerHTML+=`${i+1}° ${r.name} - ${r.time.toFixed(3)}s<br>`;
 });
 }
 
-/* ================= PDF FEDERACION ================= */
+/* ===== TEXTO REPORTE ===== */
 
-async function generarPDF(test,nombreArchivo){
+function generarTexto(test){
+if(!test) return "";
+let texto=`PRUEBA: ${test.name}\nFecha: ${test.date}\n\n`;
+test.results.forEach(r=>{
+texto+=`${r.athlete} - ${r.time.toFixed(3)}s\n`;
+});
+return texto;
+}
 
+/* ===== PDF ===== */
+
+async function generarPDF(texto,nombreArchivo){
 const { jsPDF } = window.jspdf;
 const doc = new jsPDF();
-
 let y=20;
 
-/* LOGO (puedes cambiar la URL por tu logo real) */
-let logo="https://upload.wikimedia.org/wikipedia/commons/3/3f/Swimming_pictogram.svg";
-let img=await fetch(logo)
-.then(r=>r.blob())
-.then(b=>new Promise(res=>{
-let reader=new FileReader();
-reader.onload=()=>res(reader.result);
-reader.readAsDataURL(b);
-}));
+let logo=document.getElementById("logoInput").files[0];
+if(logo){
+let base=await fileToBase64(logo);
+doc.addImage(base,"PNG",15,10,40,20);
+}
 
-doc.addImage(img,"PNG",80,5,50,20);
+doc.setFontSize(14);
+doc.text("REPORTE OFICIAL",105,25,null,null,"center");
+y=40;
 
-/* TITULO */
-doc.setFontSize(16);
-doc.text("REPORTE OFICIAL DE COMPETENCIA",105,35,null,null,"center");
-
-doc.setFontSize(12);
-doc.text(test.name+" - "+test.distance+"m",105,45,null,null,"center");
-doc.text("Fecha: "+test.date,105,52,null,null,"center");
-
-y=65;
-
-doc.setFontSize(11);
-doc.text("POS | ATLETA | EDAD | SEXO | TIEMPO (s)",15,y);
-y+=5;
-
-let orden=[...test.results].sort((a,b)=>a.time-b.time);
-
-orden.forEach((r,i)=>{
-let info=athletes.find(a=>a.user===r.athlete)||{};
-if(y>280){doc.addPage(); y=20;}
-doc.text(
-`${i+1} | ${r.athlete} | ${info.age||"-"} | ${info.sex||"-"} | ${r.time.toFixed(3)}`,
-15,y
-);
+let lines=doc.splitTextToSize(texto,180);
+lines.forEach(l=>{
+if(y>270){doc.addPage();y=20;}
+doc.text(l,15,y);
 y+=6;
 });
+
+let firma=document.getElementById("firmaInput").files[0];
+let coach=document.getElementById("coachName").value;
+
+if(firma){
+doc.addPage();
+let base=await fileToBase64(firma);
+doc.text("Firma Entrenador:",20,40);
+doc.addImage(base,"PNG",20,50,60,30);
+if(coach) doc.text(coach,20,90);
+}
 
 doc.save(nombreArchivo+".pdf");
 }
 
-/* ================= DESCARGAS ================= */
+function fileToBase64(file){
+return new Promise((res,rej)=>{
+let reader=new FileReader();
+reader.readAsDataURL(file);
+reader.onload=()=>res(reader.result);
+reader.onerror=error=>rej(error);
+});
+}
+
+/* ===== DESCARGAS ===== */
 
 function downloadFull(){
-allTests.forEach((t,i)=>{
-generarPDF(t,"historial_prueba_"+(i+1));
-});
+let texto="";
+allTests.forEach(t=>texto+=generarTexto(t)+"\n");
+generarPDF(texto,"historial_completo");
 }
 
 function downloadByAthlete(){
 let atleta=downloadAthleteSelect.value;
+let texto="";
 allTests.forEach(t=>{
 let filtrado=t.results.filter(r=>r.athlete===atleta);
-if(filtrado.length>0){
-let copia={...t,results:filtrado};
-generarPDF(copia,"historial_"+atleta);
-}
+filtrado.forEach(f=>{
+texto+=`${atleta} - ${f.time.toFixed(3)}s\n`;
 });
+});
+generarPDF(texto,"historial_"+atleta);
 }
 
 function downloadByDate(){
 let fecha=downloadDate.value;
+let texto="";
 allTests.forEach(t=>{
-if(t.date===fecha){
-generarPDF(t,"historial_"+fecha);
-}
+if(t.date===fecha) texto+=generarTexto(t);
 });
+generarPDF(texto,"historial_"+fecha);
 }
 
 function downloadByTest(){
 let index=downloadTestSelect.value;
 let test=allTests[index];
-generarPDF(test,"historial_"+test.name);
+if(!test) return alert("Seleccione prueba");
+generarPDF(generarTexto(test),"historial_"+test.name);
 }
 
 function renderAll(){
